@@ -17,7 +17,12 @@ export const StudentOnboardingSchema = z.object({
   
   // Step 3: Academic Baseline
   currentYear: z.string().min(1, "Please select current year"),
-  currentGpa: z.string().min(1, "GPA is required"), // Stored as string from input, converted to float later
+  
+  // UPDATED: Coerce to number and enforce 0-10 scale
+  currentGpa: z.coerce
+    .number()
+    .min(0, "GPA cannot be negative")
+    .max(10, "GPA cannot exceed 10"), 
 });
 
 export type StudentFormValues = z.infer<typeof StudentOnboardingSchema>;

@@ -1,81 +1,82 @@
 "use server";
 
-import { account, client } from "@/lib/appwrite/config";
-import { ID } from "appwrite";
 import { cookies } from "next/headers";
+import { Client, Account, Databases, ID } from "node-appwrite";
 
-export async function getLoggedInUser() {
+function createServerClient() {
+  return new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!);
+}
+
+// 1. SIGN UP LOGIC
+export async function signUpUser(formData: FormData) {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const name = formData.get("name") as string;
+  const rollNo = formData.get("rollNo") as string;
+
   try {
-    const cookieStore = await cookies(); // MUST HAVE AWAIT
-    const session = cookieStore.get("appwrite-session");
+    const client = createServerClient();
+    const account = new Account(client);
 
-    if (!session || !session.value) return null;
+    const newAccount = await account.create(ID.unique(), email, password, name);
+    const session = await account.createEmailPasswordSession(email, password);
 
-    client.setSession(session.value); 
-    
-    const user = await account.get();
-    return JSON.parse(JSON.stringify(user));
-  } catch (error) {
+    const sessionClient = createServerClient().setSession(session.secret);
+    const sessionDatabases = new Databases(sessionClient);
+
+    await sessionDatabases.createDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      newAccount.$id, 
+      { fullName: name, email, rollNo, department: "Pending Assignment" }
+    );
+
+    return { userId: newAccount.$id, secret: session.secret };
+  } catch (error: any) {
+    console.error("Sign up failed:", error.message);
     return null;
   }
 }
 
-export async function signUpUser(email: string, password: string, name: string) {
+// 2. SIGN IN LOGIC
+export async function signInUser(formData: FormData) {
+  // 1. Extract and trim data
+  const email = (formData.get("email") as string).trim();
+  const password = formData.get("password") as string;
+
   try {
-    const newAccount = await account.create(
-      ID.unique(), 
-      email, 
-      password, 
-      name
-    );
-
-    const session = await account.createEmailPasswordSession(email, password);
-
-    // Manually set the cookie for the session
-    const cookieStore = await cookies();
-    cookieStore.set("appwrite-session", session.secret, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "strict",
-      secure: true,
-    });
-
-    return JSON.parse(JSON.stringify({ success: true, account: newAccount }));
+    const client = createServerClient();
+    const account = new Account(client);
     
+    // 2. Authenticate with Appwrite
+    const session = await account.createEmailPasswordSession(email, password);
+    
+    // 3. CRITICAL: You MUST return this object so the frontend can see the secret
+    return { 
+      userId: session.userId, 
+      secret: session.secret 
+    };
+
   } catch (error: any) {
-    console.error("Sign Up Error:", error);
-    return JSON.parse(JSON.stringify({ success: false, error: error.message }));
+    console.error("Appwrite Login Error:", error.message);
+    // Return null so the frontend knows the credentials were actually wrong
+    return null; 
   }
 }
 
-export async function signInUser(email: string, password: string) {
-  try {
-    const session = await account.createEmailPasswordSession(email, password);
-    
-    // NEXT.JS 15 FIX: Manually set the cookie so Server Components can read it
-    const cookieStore = await cookies();
-    cookieStore.set("appwrite-session", session.secret, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "strict",
-      secure: true,
-    });
-
-    return JSON.parse(JSON.stringify({ success: true, session }));
-    
-  } catch (error: any) {
-    console.error("Sign In Error:", error);
-    return JSON.parse(JSON.stringify({ success: false, error: error.message }));
-  }
-}
-
-export async function logoutUser() {
+// 3. GET LOGGED IN USER
+export async function getLoggedInUser() {
   try {
     const cookieStore = await cookies();
-    cookieStore.delete("appwrite-session");
-    await account.deleteSession("current");
-    return { success: true };
+    const sessionCookie = cookieStore.get("appwrite-session");
+    if (!sessionCookie || !sessionCookie.value) return null;
+
+    const client = createServerClient().setSession(sessionCookie.value);
+    const account = new Account(client);
+    return await account.get();
   } catch (error) {
-    return { success: false };
+    return null;
   }
 }

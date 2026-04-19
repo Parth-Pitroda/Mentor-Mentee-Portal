@@ -1,0 +1,130 @@
+import { getLoggedInUser } from "@/lib/actions/auth.actions";
+import { redirect } from "next/navigation";
+import { databases } from "@/lib/appwrite/config";
+import { Query } from "appwrite";
+
+export default async function AcademicsPage({ 
+  params 
+}: { 
+  params: Promise<{ profileId: string }> 
+}) {
+  // 1. Await params (Next.js 15)
+  const { profileId } = await params;
+  
+  const user = await getLoggedInUser();
+  if (!user) redirect("/sign-in");
+
+  let profileData = null;
+  let academicRecords = [];
+  let latestRecord = null;
+
+  try {
+    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+    const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+    const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!; 
+
+    // Fetch Profile and All Academic Records
+    const [profileRes, academicsRes] = await Promise.all([
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, profileId),
+      databases.listDocuments(DATABASE_ID, ACADEMICS_COLLECTION, [
+        Query.equal("studentId", profileId),
+        Query.orderDesc("$createdAt") // Gets the newest records first
+      ])
+    ]);
+
+    profileData = JSON.parse(JSON.stringify(profileRes));
+    academicRecords = JSON.parse(JSON.stringify(academicsRes.documents));
+    
+    // Grab the most recent semester for the top summary cards
+    if (academicRecords.length > 0) {
+      latestRecord = academicRecords[0];
+    }
+    
+  } catch (error) {
+    console.error("Academics data fetch failed:", error);
+  }
+
+  return (
+    <div className="animate-in fade-in duration-500">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 leading-tight">Academic Performance</h2>
+        <p className="text-slate-500 mt-1 font-medium">
+          Track your semester results and overall progress.
+        </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Current Semester</h3>
+          <p className="text-3xl font-bold text-blue-600 mt-2">
+            {latestRecord ? `Sem ${latestRecord.semester}` : "-"}
+          </p>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cumulative Performance (CPI)</h3>
+          <p className="text-3xl font-bold text-slate-800 mt-2">
+            {latestRecord?.cpi || "-"}
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Latest Semester (SPI)</h3>
+          <p className="text-3xl font-bold text-slate-800 mt-2">
+            {latestRecord?.spi || "-"}
+          </p>
+        </div>
+      </div>
+
+      {/* Detailed Records Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">Semester History</h3>
+            <p className="text-xs text-slate-400">Official academic records logged in the system</p>
+          </div>
+          <button className="text-sm px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors font-medium">
+            Download Transcript
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4">Semester</th>
+                <th className="px-6 py-4">SPI (Semester Perf.)</th>
+                <th className="px-6 py-4">CPI (Cumulative Perf.)</th>
+                <th className="px-6 py-4">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {academicRecords.length > 0 ? (
+                academicRecords.map((record: any) => (
+                  <tr key={record.$id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-700">Semester {record.semester}</td>
+                    <td className="px-6 py-4 text-slate-600">{record.spi}</td>
+                    <td className="px-6 py-4 font-medium text-blue-600">{record.cpi}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-100 rounded-md text-[11px] font-bold uppercase tracking-wider">
+                        Cleared
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400">
+                    No academic records found for this profile.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

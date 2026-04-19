@@ -1,116 +1,86 @@
-import { getStudentProfile } from "@/lib/actions/student.actions";
-import { notFound, redirect } from "next/navigation";
-import { account } from "@/lib/appwrite/config";
+import { databases } from "@/lib/appwrite/config";
+import { Query } from "appwrite";
+import MeetingTableWrapper from "@/components/MeetingTableWrapper";
 
-export default async function DashboardPage({ 
+export default async function DashboardOverviewPage({ 
   params 
 }: { 
   params: Promise<{ profileId: string }> 
 }) {
   const { profileId } = await params;
-  const data = await getStudentProfile(profileId);
+  
+  let profileData = null;
+  let meetings = [];
+  let academicData = null;
 
-  if (!data || !data.profile) {
-    notFound();
-  }
+  try {
+    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+    const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+    const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
+    const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!; 
 
-  const { profile, academics } = data;
+    const [profileRes, meetingsRes, academicsRes] = await Promise.all([
+      // Add .catch(() => null) so it doesn't crash if the profile is missing
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, profileId).catch(() => null),
+      
+      // Add safe fallbacks for the lists too
+      databases.listDocuments(DATABASE_ID, MEETINGS_COLLECTION, [
+        Query.equal("studentId", profileId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(3)
+      ]).catch(() => ({ documents: [] })),
+      
+      databases.listDocuments(DATABASE_ID, ACADEMICS_COLLECTION, [
+        Query.equal("studentId", profileId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(1)
+      ]).catch(() => ({ documents: [] }))
+    ]);
 
-  // Server Action for Logout
-  async function handleLogout() {
-    "use server";
-    try {
-      // In a real production app, you'd use a dedicated auth library, 
-      // but for this Appwrite setup, we redirect to sign-in after clearing local state.
-      redirect("/sign-in");
-    } catch (e) {
-      redirect("/sign-in");
-    }
+    // Only parse the profile if it actually exists!
+    profileData = profileRes ? JSON.parse(JSON.stringify(profileRes)) : null;
+    meetings = JSON.parse(JSON.stringify(meetingsRes.documents));
+    academicData = academicsRes.documents.length > 0 ? JSON.parse(JSON.stringify(academicsRes.documents[0])) : null;
+    
+  } catch (error) {
+    console.error("Data fetch failed:", error);
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-slate-900 leading-tight">
+          Welcome, {profileData?.fullName || "Student"} {/* <-- Changed to fullName */}
+       </h2>
+        <p className="text-slate-500 mt-1 font-medium">
+           Pandit Deendayal Energy University • {profileData?.department || "Department"} 
+         </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Attendance</h3>
+          <p className="text-3xl font-bold text-blue-600 mt-2">94.2%</p>
+        </div>
         
-        {/* Top Navigation / Header */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Mentee Dashboard</h1>
-            <p className="text-sm text-gray-500">Welcome back, {profile.fullName}</p>
-          </div>
-          <form action={handleLogout}>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-              Logout
-            </button>
-          </form>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Profile Details */}
-          <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">Student Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase">Department</label>
-                <p className="text-gray-900 font-medium">{profile.department}</p>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase">Verification</label>
-                <p className="text-sm">
-                  {profile.isVerified ? "✅ Verified by Mentor" : "⏳ Pending Verification"}
-                </p>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Contact & Roll Details</label>
-                <div className="mt-1 p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-700 text-sm">
-                  {profile.bio}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Academic Snapshot */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">Academics</h2>
-            {academics ? (
-              <div className="space-y-6">
-                <div className="text-center p-4 bg-blue-50 rounded-xl">
-                  <p className="text-xs text-blue-600 font-bold uppercase">Current Year</p>
-                  <p className="text-3xl font-black text-blue-800">{academics.year}</p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-xl">
-                  <p className="text-xs text-green-600 font-bold uppercase">Current GPA</p>
-                  <p className="text-3xl font-black text-green-800">{academics.gpa}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-400 text-sm italic">No records found.</p>
-            )}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Academics</h3>
+          <p className="text-xl font-bold text-slate-800 mt-2">
+            {academicData?.semester ? `Semester ${academicData.semester}` : "No Data"}
+          </p>
+          <div className="flex gap-4 mt-1">
+            <p className="text-sm text-slate-500 font-medium">CPI: <span className="text-blue-600">{academicData?.cpi || "N/A"}</span></p>
+            <p className="text-sm text-slate-500 font-medium">SPI: <span className="text-blue-600">{academicData?.spi || "N/A"}</span></p>
           </div>
         </div>
 
-        {/* Requirements from Professor's Sketch */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-dashed border-gray-300 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-50 text-purple-600 rounded-full mb-4">
-              🏆
-            </div>
-            <h3 className="font-bold text-gray-800">Achievements</h3>
-            <p className="text-sm text-gray-500 mt-1">Track Hackathons, GATE, and Internships.</p>
-            <button className="mt-4 text-sm font-semibold text-purple-600 hover:text-purple-700">Coming Soon →</button>
-          </div>
-
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-dashed border-gray-300 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-50 text-orange-600 rounded-full mb-4">
-              📅
-            </div>
-            <h3 className="font-bold text-gray-800">Meetings</h3>
-            <p className="text-sm text-gray-500 mt-1">Logs for Online and Offline sessions.</p>
-            <button className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700">Coming Soon →</button>
-          </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Primary Mentor</h3>
+          <p className="text-xl font-bold text-slate-800 mt-2">Dr. R.K. Mehta</p>
         </div>
       </div>
-    </div>
+
+      <MeetingTableWrapper initialMeetings={meetings} profileId={profileId} />
+    </>
   );
 }
