@@ -42,7 +42,6 @@ export async function signUpUser(formData: FormData) {
 
 // 2. SIGN IN LOGIC
 export async function signInUser(formData: FormData) {
-  // 1. Extract and trim data
   const email = (formData.get("email") as string).trim();
   const password = formData.get("password") as string;
 
@@ -50,19 +49,18 @@ export async function signInUser(formData: FormData) {
     const client = createServerClient();
     const account = new Account(client);
     
-    // 2. Authenticate with Appwrite
     const session = await account.createEmailPasswordSession(email, password);
     
-    // 3. CRITICAL: You MUST return this object so the frontend can see the secret
     return { 
       userId: session.userId, 
-      secret: session.secret 
+      secret: session.secret,
+      error: null 
     };
 
   } catch (error: any) {
     console.error("Appwrite Login Error:", error.message);
-    // Return null so the frontend knows the credentials were actually wrong
-    return null; 
+    // CRITICAL: We now return the EXACT error message to the frontend
+    return { userId: null, secret: null, error: error.message };
   }
 }
 
