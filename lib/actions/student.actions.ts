@@ -1,8 +1,10 @@
 "use server";
 
 import { databases } from "@/lib/appwrite/config";
-import { ID, Query } from "appwrite";
 import { revalidatePath } from "next/cache";
+import { Client, Databases, Storage, ID, Query } from "node-appwrite";
+import { InputFile } from "node-appwrite/file"; 
+
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
@@ -229,9 +231,15 @@ export async function getMeetings(studentId: string) {
 }
 
 // ==========================================
-// 10. Log a Meeting
+// 10. Log a Meeting (Secure Server Action)
 // ==========================================
-export async function logMeeting(studentId: string, date: string, topic: string) {
+export async function logMeeting(data: { 
+  studentId: string, 
+  date: string, 
+  topic: string, 
+  mentorName: string, 
+  description: string 
+}) {
   try {
     const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
@@ -241,16 +249,218 @@ export async function logMeeting(studentId: string, date: string, topic: string)
       MEETINGS_COLLECTION,
       ID.unique(),
       {
-        studentId,
-        date,
-        topic
+        studentId: data.studentId,
+        date: data.date,
+        topic: data.topic,
+        mentorName: data.mentorName,
+        description: data.description,
+        status: "Pending" // Defaults to Pending until Mentor verifies
       }
     );
 
-    revalidatePath(`/dashboard/${studentId}`);
-    return JSON.parse(JSON.stringify({ success: true }));
-  } catch (error) {
+    // Refresh the page data automatically
+    revalidatePath(`/dashboard/${data.studentId}/meetings`);
+    return { success: true };
+  } catch (error: any) {
     console.error("Failed to log meeting:", error);
-    return JSON.parse(JSON.stringify({ success: false }));
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 11. Update Meeting Status (Mentor Action)
+// ==========================================
+export async function updateMeetingStatus(meetingId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+  try {
+    // 1. Initialize an ADMIN Client to bypass document ownership rules
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!); // This gives the server permission to edit ANY document
+
+    const adminDatabases = new Databases(adminClient);
+
+    // 2. Perform the update using the Admin privileges
+    await adminDatabases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      meetingId,
+      { status: newStatus }
+    );
+
+    // 3. Clear Next.js cache for all relevant pages so the badge updates instantly
+    revalidatePath(`/mentor-dashboard`);
+    revalidatePath(`/dashboard/${studentId}/meetings`);
+    revalidatePath(`/dashboard/${studentId}`); 
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to update meeting status:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+
+// ... (Keep all your existing functions) ...
+
+// ==========================================
+// 12. Upload Academic Record & File (Mentee)
+// ==========================================
+export async function uploadAcademicRecord(formData: FormData, studentId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const storage = new Storage(adminClient);
+    const databases = new Databases(adminClient);
+
+    const semester = formData.get("semester") as string;
+    const spi = formData.get("spi") as string;
+    const cpi = formData.get("cpi") as string;
+    const file = formData.get("file") as File;
+
+    // 2. THE FIX: Convert the Web File into a Node Buffer for Appwrite
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
+
+    // 3. Upload using the new buffer
+    const uploadedFile = await storage.createFile(
+      process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID!,
+      ID.unique(),
+      appwriteInputFile // <-- Use the converted file here!
+    );
+
+    await databases.createDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      ID.unique(),
+      {
+        studentId,
+        semester: semester,
+        spi: spi,
+        cpi: cpi,
+        fileId: uploadedFile.$id,
+        status: "Pending"
+      }
+    );
+
+    revalidatePath(`/dashboard/${studentId}/academics`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Upload failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 13. Verify/Reject Academic Record (Mentor)
+// ==========================================
+export async function updateAcademicStatus(recordId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      recordId,
+      { status: newStatus }
+    );
+
+    revalidatePath(`/dashboard/${studentId}/academics`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Verification failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 14. Upload Achievement (Mentee)
+// ==========================================
+export async function uploadAchievement(formData: FormData, studentId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const storage = new Storage(adminClient);
+    const databases = new Databases(adminClient);
+
+    const title = formData.get("title") as string;
+    const category = formData.get("category") as string;
+    const description = formData.get("description") as string;
+    const file = formData.get("file") as File | null;
+
+    let fileId = null;
+
+    // Only upload to storage if a proof file was actually attached
+    if (file && file.size > 0 && file.name !== "undefined") {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
+
+      const uploadedFile = await storage.createFile(
+        process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID!,
+        ID.unique(),
+        appwriteInputFile
+      );
+      fileId = uploadedFile.$id;
+    }
+
+    await databases.createDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      ID.unique(),
+      {
+        studentId,
+        title,
+        category,
+        description,
+        fileId,
+        status: "Pending"
+      }
+    );
+
+    revalidatePath(`/dashboard/${studentId}/achievements`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Achievement upload failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 15. Verify/Reject Achievement (Mentor)
+// ==========================================
+export async function updateAchievementStatus(achievementId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      achievementId,
+      { status: newStatus }
+    );
+
+    revalidatePath(`/dashboard/${studentId}/achievements`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Achievement verification failed:", error);
+    return { success: false, error: error.message };
   }
 }

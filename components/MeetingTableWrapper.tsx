@@ -2,12 +2,21 @@
 
 import { useState } from "react";
 import MeetingLogForm from "./forms/MeetingLogForm";
+import { updateMeetingStatus } from "@/lib/actions/student.actions";
 
-export default function MeetingTableWrapper({ initialMeetings, profileId }: any) {
-  // State for the "Create New" form modal
+export default function MeetingTableWrapper({ initialMeetings, profileId, isMentor = false }: any) {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  // State to hold the specific log data when "View Details" is clicked
   const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Handle Mentor Verification Actions
+  const handleStatusUpdate = async (status: "Verified" | "Rejected") => {
+    setIsUpdating(true);
+    await updateMeetingStatus(selectedLog.$id, status, profileId);
+    setIsUpdating(false);
+    setSelectedLog(null);
+    window.location.reload(); // Refresh to see the new badge color
+  };
 
   return (
     <>
@@ -17,12 +26,16 @@ export default function MeetingTableWrapper({ initialMeetings, profileId }: any)
             <h3 className="font-bold text-slate-800 text-lg">Recent Meeting Logs</h3>
             <p className="text-xs text-slate-400">View and track your mentorship history</p>
           </div>
-          <button 
-            onClick={() => setIsNewModalOpen(true)}
-            className="text-sm px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm shadow-blue-100"
-          >
-            New Meeting Log
-          </button>
+          
+          {/* Only mentees should see the "New Meeting Log" button */}
+          {!isMentor && (
+            <button 
+              onClick={() => setIsNewModalOpen(true)}
+              className="text-sm px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm shadow-blue-100"
+            >
+              New Meeting Log
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -43,13 +56,14 @@ export default function MeetingTableWrapper({ initialMeetings, profileId }: any)
                     <td className="px-6 py-4 text-slate-600">{log.topic}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${
-                        log.status === 'Verified' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                        log.status === 'Verified' ? 'bg-green-50 text-green-700 border-green-100' : 
+                        log.status === 'Rejected' ? 'bg-red-50 text-red-700 border-red-100' :
+                        'bg-yellow-50 text-yellow-700 border-yellow-100'
                       }`}>
                         {log.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {/* Clicking this sets the selectedLog state, opening the details modal */}
                       <button 
                         onClick={() => setSelectedLog(log)}
                         className="text-blue-600 hover:text-blue-800 font-medium"
@@ -73,20 +87,9 @@ export default function MeetingTableWrapper({ initialMeetings, profileId }: any)
       {isNewModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-8 relative">
-            <button 
-              onClick={() => setIsNewModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-            >
-              ✕
-            </button>
+            <button onClick={() => setIsNewModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
             <h2 className="text-2xl font-bold text-slate-900 mb-6">Create New Meeting Log</h2>
-            <MeetingLogForm 
-              profileId={profileId} 
-              onSuccess={() => {
-                setIsNewModalOpen(false);
-                window.location.reload(); 
-              }} 
-            />
+            <MeetingLogForm profileId={profileId} onSuccess={() => { setIsNewModalOpen(false); window.location.reload(); }} />
           </div>
         </div>
       )}
@@ -95,18 +98,15 @@ export default function MeetingTableWrapper({ initialMeetings, profileId }: any)
       {selectedLog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-8 relative">
-            <button 
-              onClick={() => setSelectedLog(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-            >
-              ✕
-            </button>
+            <button onClick={() => setSelectedLog(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
             
             <div className="mb-6">
               <div className="flex justify-between items-start mb-2">
                 <h2 className="text-2xl font-bold text-slate-900 leading-tight">{selectedLog.topic}</h2>
                 <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${
-                  selectedLog.status === 'Verified' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                  selectedLog.status === 'Verified' ? 'bg-green-50 text-green-700 border-green-100' : 
+                  selectedLog.status === 'Rejected' ? 'bg-red-50 text-red-700 border-red-100' :
+                  'bg-yellow-50 text-yellow-700 border-yellow-100'
                 }`}>
                   {selectedLog.status}
                 </span>
@@ -116,10 +116,28 @@ export default function MeetingTableWrapper({ initialMeetings, profileId }: any)
 
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 mb-6">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Discussion Summary</h3>
-              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
-                {selectedLog.description}
-              </p>
+              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedLog.description}</p>
             </div>
+
+            {/* MENTOR ACTION BUTTONS */}
+            {isMentor && selectedLog.status === 'Pending' && (
+              <div className="flex gap-3 mb-4">
+                <button 
+                  onClick={() => handleStatusUpdate("Verified")}
+                  disabled={isUpdating}
+                  className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {isUpdating ? "..." : "✓ Verify Meeting"}
+                </button>
+                <button 
+                  onClick={() => handleStatusUpdate("Rejected")}
+                  disabled={isUpdating}
+                  className="flex-1 py-3 bg-red-100 text-red-700 rounded-lg font-bold hover:bg-red-200 transition-colors disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
 
             <button 
               onClick={() => setSelectedLog(null)}

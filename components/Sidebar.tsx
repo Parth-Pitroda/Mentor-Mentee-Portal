@@ -46,6 +46,20 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
         >
           Academic Records
         </Link>
+        
+        {/* 👇 NEW ACHIEVEMENTS LINK ADDED HERE 👇 */}
+        <Link 
+          href={`/dashboard/${profileId}/achievements`} 
+          className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
+            isActive(`/dashboard/${profileId}/achievements`) 
+              ? "bg-blue-50 text-blue-700" 
+              : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+          }`}
+        >
+          Achievements
+        </Link>
+        {/* 👆 ================================ 👆 */}
+
         <Link 
           href={`/dashboard/${profileId}/profile`} 
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${

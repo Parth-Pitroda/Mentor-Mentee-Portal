@@ -17,23 +17,29 @@ export default function SignInPage() {
     
     try {
       const response = await signInUser(formData);
-
+      
       if (response && response.secret) {
-        // Success! Inject cookie and redirect
+        // 1. Save the session cookie securely
         document.cookie = `appwrite-session=${response.secret}; path=/; max-age=604800; SameSite=Lax`;
+        
+        // 2. Smart Routing based on Database Role!
         setTimeout(() => {
-          window.location.href = `/dashboard/${response.userId}`;
+          if (response.role === "mentor") {
+            window.location.href = `/mentor-dashboard`; // ➔ Route to Mentor Control Panel
+          } else {
+            window.location.href = `/dashboard/${response.userId}`; // ➔ Route to Mentee Dashboard
+          }
         }, 300);
+
       } else if (response && response.error) {
-        // Appwrite rejected it. This will print EXACTLY why.
-        setErrorMsg(`Appwrite says: ${response.error}`);
+        setErrorMsg(`Appwrite Error: ${response.error}`);
         setIsLoading(false);
       } else {
-        setErrorMsg("Connection failed. Please try again.");
+        setErrorMsg(`Server returned: ${JSON.stringify(response)}`);
         setIsLoading(false);
       }
-    } catch (error) {
-      setErrorMsg("An unexpected error occurred.");
+    } catch (error: any) {
+      setErrorMsg(`Client Crash: ${error.message}`);
       setIsLoading(false);
     }
   };
@@ -48,7 +54,7 @@ export default function SignInPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {errorMsg && (
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-center text-sm font-medium border border-red-100">
+            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-center text-sm font-medium border border-red-100 break-words">
               {errorMsg}
             </div>
           )}

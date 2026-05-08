@@ -33,6 +33,12 @@ export default async function DashboardLayout({
           <Link href={`/dashboard/${profileId}/academics`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
             Academic Records
           </Link>
+          <Link href={`/dashboard/${profileId}/achievements`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
+            Achievements
+          </Link>
+          <Link href={`/dashboard/${profileId}/profile`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
+            Mentorship Profile
+          </Link>
         </nav>
         <div className="p-4 border-t border-slate-100">
            <div className="flex items-center gap-3 px-2">

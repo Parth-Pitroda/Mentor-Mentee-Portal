@@ -9,26 +9,34 @@ export default async function MeetingsPage({
 }: { 
   params: Promise<{ profileId: string }> 
 }) {
-  // 1. Await params (Next.js 15)
   const { profileId } = await params;
   
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
   let meetings = [];
+  let isMentor = false;
 
   try {
     const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-    // Using the exact variable name from your .env
     const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
+    const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
 
-    // Fetch ALL meetings for this student
+    // 1. Check if the currently logged-in user is a Mentor
+    const currentUserProfile = await databases.listDocuments(DATABASE_ID, PROFILES_COLLECTION, [
+      Query.equal("email", [user.email.toLowerCase()])
+    ]);
+    
+    if (currentUserProfile.total > 0 && currentUserProfile.documents[0].role === "mentor") {
+      isMentor = true;
+    }
+
+    // 2. Fetch all meetings for this specific student
     const meetingsRes = await databases.listDocuments(DATABASE_ID, MEETINGS_COLLECTION, [
       Query.equal("studentId", profileId),
-      Query.orderDesc("$createdAt")
+      Query.orderDesc("date") // Sorts by newest date first
     ]);
 
-    // Sanitize the Appwrite objects for the Client Component
     meetings = JSON.parse(JSON.stringify(meetingsRes.documents));
     
   } catch (error) {
@@ -37,7 +45,6 @@ export default async function MeetingsPage({
 
   return (
     <div className="animate-in fade-in duration-500">
-      {/* Page Header */}
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-slate-900 leading-tight">Meeting Logs</h2>
         <p className="text-slate-500 mt-1 font-medium">
@@ -45,12 +52,11 @@ export default async function MeetingsPage({
         </p>
       </div>
 
-      {/* We can reuse the exact same wrapper component! 
-        It already has the "New Meeting" and "View Details" modals built-in.
-      */}
+      {/* We pass the isMentor boolean down to unlock the verification buttons */}
       <MeetingTableWrapper 
         initialMeetings={meetings} 
         profileId={profileId} 
+        isMentor={isMentor}
       />
     </div>
   );

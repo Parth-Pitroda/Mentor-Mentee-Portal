@@ -1,9 +1,9 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
 import { redirect } from "next/navigation";
-import { Client, Databases, Query } from "node-appwrite"; // <-- Only using the Node SDK!
-import AcademicsManager from "@/components/AcademicsManager";
+import { Client, Databases, Query } from "node-appwrite";
+import AchievementsManager from "@/components/AchievementsManager";
 
-export default async function AcademicsPage({ 
+export default async function AchievementsPage({ 
   params 
 }: { 
   params: Promise<{ profileId: string }> 
@@ -13,11 +13,10 @@ export default async function AcademicsPage({
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
-  let academicRecords = [];
+  let achievements = [];
   let isMentor = false;
 
   try {
-    // 1. Securely initialize the Server Client inside the component
     const client = new Client()
       .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
       .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
@@ -27,9 +26,9 @@ export default async function AcademicsPage({
 
     const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
-    const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!; 
+    const ACHIEVEMENTS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!; 
 
-    // 2. Role Check
+    // Check if user is a mentor
     const currentUserProfile = await databases.listDocuments(DATABASE_ID, PROFILES_COLLECTION, [
       Query.equal("email", [user.email.toLowerCase()])
     ]);
@@ -38,28 +37,28 @@ export default async function AcademicsPage({
       isMentor = true;
     }
 
-    // 3. Fetch Student's Academic Records
-    const academicsRes = await databases.listDocuments(DATABASE_ID, ACADEMICS_COLLECTION, [
+    // Fetch achievements
+    const achievementsRes = await databases.listDocuments(DATABASE_ID, ACHIEVEMENTS_COLLECTION, [
       Query.equal("studentId", profileId),
       Query.orderDesc("$createdAt") 
     ]);
-    academicRecords = JSON.parse(JSON.stringify(academicsRes.documents));
+    achievements = JSON.parse(JSON.stringify(achievementsRes.documents));
     
   } catch (error) {
-    console.error("Academics data fetch failed:", error);
+    console.error("Achievements data fetch failed:", error);
   }
 
   return (
     <div className="animate-in fade-in duration-500">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-900 leading-tight">Document Verification</h2>
+        <h2 className="text-3xl font-bold text-slate-900 leading-tight">Extra-Curricular Achievements</h2>
         <p className="text-slate-500 mt-1 font-medium">
-          Manage and verify university marksheets and performance metrics.
+          Track and verify Hackathons, Internships, Exams, and Certifications.
         </p>
       </div>
 
-      <AcademicsManager 
-        initialRecords={academicRecords} 
+      <AchievementsManager 
+        initialRecords={achievements} 
         profileId={profileId} 
         isMentor={isMentor} 
       />
