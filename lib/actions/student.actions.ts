@@ -464,3 +464,69 @@ export async function updateAchievementStatus(achievementId: string, newStatus: 
     return { success: false, error: error.message };
   }
 }
+
+// ==========================================
+// 16. Update Profile Details (Mentee)
+// ==========================================
+export async function updateProfileDetails(profileId: string, department: string, skillsString: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Convert comma-separated string "React, Node, Python" into an array ["React", "Node", "Python"]
+    const skillsArray = skillsString
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter((skill) => skill !== ""); // Remove any accidental empty strings
+
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      profileId,
+      { 
+        department: department,
+        skills: skillsArray 
+      }
+    );
+
+    revalidatePath(`/dashboard/${profileId}/profile`);
+    revalidatePath(`/dashboard/${profileId}`); // Also update the overview page!
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Profile update failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 17. Assign Mentor to Student (Admin Action)
+// ==========================================
+export async function assignMentor(studentId: string, mentorId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Update the student's profile with the new mentorId
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId,
+      { mentorId: mentorId }
+    );
+
+    revalidatePath(`/admin-dashboard`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Assignment failed:", error);
+    return { success: false, error: error.message };
+  }
+}
