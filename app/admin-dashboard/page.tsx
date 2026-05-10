@@ -2,6 +2,7 @@ import { getLoggedInUser } from "@/lib/actions/auth.actions";
 import { redirect } from "next/navigation";
 import { Client, Databases, Query } from "node-appwrite";
 import AssignmentManager from "@/components/AssignmentManager";
+import BulkImportManager from "@/components/BulkImportManager";
 
 export default async function AdminDashboardPage() {
   const user = await getLoggedInUser();
@@ -65,6 +66,7 @@ export default async function AdminDashboardPage() {
           <p className="text-slate-500 mt-1 font-medium">Review unassigned students and pair them with faculty mentors.</p>
         </div>
 
+        <BulkImportManager />
         <AssignmentManager 
           unassignedStudents={unassignedStudents} 
           availableMentors={availableMentors} 

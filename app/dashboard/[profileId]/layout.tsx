@@ -1,6 +1,7 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Toaster } from "react-hot-toast";
 
 export const dynamic = "force-dynamic";
 

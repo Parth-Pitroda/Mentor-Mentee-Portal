@@ -2,8 +2,9 @@
 
 import { databases } from "@/lib/appwrite/config";
 import { revalidatePath } from "next/cache";
-import { Client, Databases, Storage, ID, Query } from "node-appwrite";
-import { InputFile } from "node-appwrite/file"; 
+import { InputFile } from "node-appwrite/file";
+import { Client, Databases, ID, Query, Storage, Users } from "node-appwrite";
+import { ProfileUpdateSchema } from "@/lib/validation/schema";
 
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
@@ -470,6 +471,17 @@ export async function updateAchievementStatus(achievementId: string, newStatus: 
 // ==========================================
 export async function updateProfileDetails(profileId: string, department: string, skillsString: string) {
   try {
+    // 2. ZOD VALIDATION: Test the incoming data against our strict rules
+    const validatedData = ProfileUpdateSchema.safeParse({
+      department: department,
+      skills: skillsString
+    });
+
+    // If it fails, instantly return the exact error message back to the UI
+    if (!validatedData.success) {
+      return { success: false, error: validatedData.error.errors[0].message };
+    }
+
     const adminClient = new Client()
       .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
       .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
@@ -477,32 +489,30 @@ export async function updateProfileDetails(profileId: string, department: string
 
     const databases = new Databases(adminClient);
 
-    // Convert comma-separated string "React, Node, Python" into an array ["React", "Node", "Python"]
-    const skillsArray = skillsString
+    const skillsArray = validatedData.data.skills
       .split(",")
       .map((skill) => skill.trim())
-      .filter((skill) => skill !== ""); // Remove any accidental empty strings
+      .filter((skill) => skill !== "");
 
     await databases.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
       profileId,
       { 
-        department: department,
+        department: validatedData.data.department,
         skills: skillsArray 
       }
     );
 
     revalidatePath(`/dashboard/${profileId}/profile`);
-    revalidatePath(`/dashboard/${profileId}`); // Also update the overview page!
+    revalidatePath(`/dashboard/${profileId}`);
     
     return { success: true };
   } catch (error: any) {
     console.error("Profile update failed:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "A server error occurred. Please try again." };
   }
 }
-
 // ==========================================
 // 17. Assign Mentor to Student (Admin Action)
 // ==========================================
@@ -527,6 +537,67 @@ export async function assignMentor(studentId: string, mentorId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Assignment failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 18. Bulk CSV Import Engine (Admin)
+// ==========================================
+export async function bulkImportStudents(studentList: Array<{ fullName: string, email: string, department: string }>) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+    const users = new Users(adminClient);
+
+    let successCount = 0;
+    let errors = [];
+
+    // Process sequentially to respect API rate limits
+    for (const student of studentList) {
+      try {
+        const emailLower = student.email.toLowerCase().trim();
+
+        // 1. Create Appwrite Auth Account (with a standardized default password)
+        // In a real production app, you might trigger a password reset email here instead
+        const authUser = await users.create(
+          ID.unique(),
+          emailLower,
+          undefined, // phone
+          "Pdeu@2026", // Default password for all imported users
+          student.fullName.trim()
+        );
+
+        // 2. Create the Database Profile
+        await databases.createDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+          ID.unique(),
+          {
+            email: emailLower,
+            fullName: student.fullName.trim(),
+            department: student.department.trim(),
+            role: "mentee",
+            isVerified: true // Auto-verify since an admin uploaded them
+          }
+        );
+
+        successCount++;
+      } catch (err: any) {
+        // If a single user fails (e.g. email already exists), we catch the error 
+        // but KEEP processing the rest of the CSV!
+        errors.push(`Failed for ${student.email}: ${err.message}`);
+      }
+    }
+
+    revalidatePath(`/admin-dashboard`);
+    return { success: true, successCount, errors };
+  } catch (error: any) {
+    console.error("Bulk import failed critically:", error);
     return { success: false, error: error.message };
   }
 }
