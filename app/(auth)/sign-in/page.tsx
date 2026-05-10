@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signInUser } from "@/lib/actions/auth.actions";
+import toast from "react-hot-toast"; // Ensure you import toast if you want the popups!
 
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,6 +15,7 @@ export default function SignInPage() {
     setErrorMsg("");
     
     const formData = new FormData(e.currentTarget);
+    const toastId = toast.loading("Verifying credentials...");
     
     try {
       const response = await signInUser(formData);
@@ -21,25 +23,31 @@ export default function SignInPage() {
       if (response && response.secret) {
         // 1. Save the session cookie securely
         document.cookie = `appwrite-session=${response.secret}; path=/; max-age=604800; SameSite=Lax`;
+        toast.success("Login successful!", { id: toastId });
         
-        // 2. Smart Routing based on Database Role!
+        // 2. UPGRADED: Smart Routing based on Database Role!
         setTimeout(() => {
-          if (response.role === "mentor") {
-            window.location.href = `/mentor-dashboard`; // ➔ Route to Mentor Control Panel
+          if (response.role === "admin" || response.role === "coordinator") {
+            window.location.href = `/admin-dashboard`; // ➔ Route to Admin
+          } else if (response.role === "mentor") {
+            window.location.href = `/mentor-dashboard`; // ➔ Route to Mentor
           } else {
-            window.location.href = `/dashboard/${response.userId}`; // ➔ Route to Mentee Dashboard
+            window.location.href = `/dashboard/${response.userId}`; // ➔ Route to Mentee
           }
         }, 300);
 
       } else if (response && response.error) {
         setErrorMsg(`Appwrite Error: ${response.error}`);
+        toast.error("Failed to sign in.", { id: toastId });
         setIsLoading(false);
       } else {
         setErrorMsg(`Server returned: ${JSON.stringify(response)}`);
+        toast.dismiss(toastId);
         setIsLoading(false);
       }
     } catch (error: any) {
       setErrorMsg(`Client Crash: ${error.message}`);
+      toast.dismiss(toastId);
       setIsLoading(false);
     }
   };

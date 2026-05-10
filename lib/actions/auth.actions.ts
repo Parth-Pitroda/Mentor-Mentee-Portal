@@ -3,7 +3,6 @@
 import { cookies } from "next/headers";
 import { Client, Account, Databases, ID, Query } from "node-appwrite";
 
-
 // 1. ADMIN CLIENT: Used to bypass restrictions and generate session secrets
 function createAdminClient() {
   return new Client()
@@ -20,7 +19,9 @@ function createSessionClient(sessionSecret: string) {
     .setSession(sessionSecret); // NO API KEY!
 }
 
-// SIGN UP LOGIC
+// ==========================================
+// SIGN UP LOGIC (UPGRADED WITH DYNAMIC ROLES)
+// ==========================================
 export async function signUpUser(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -37,11 +38,28 @@ export async function signUpUser(formData: FormData) {
     const sessionClient = createSessionClient(session.secret);
     const sessionDatabases = new Databases(sessionClient);
 
+    // 🧠 THE DYNAMIC ROLE ASSIGNMENT BRAIN
+    const emailLower = email.toLowerCase().trim();
+    const emailPrefix = emailLower.split('@')[0];
+    
+    // Regex test: Does the prefix contain ANY number? (\d means digit)
+    const hasNumbers = /\d/.test(emailPrefix);
+    
+    // If it has a number (like 24bcp413d), they are a mentee. Otherwise, a mentor.
+    const assignedRole = hasNumbers ? "mentee" : "mentor";
+
     await sessionDatabases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
       newAccount.$id, 
-      { fullName: name, email, rollNo, department: "Pending Assignment" }
+      { 
+        fullName: name, 
+        email: emailLower, 
+        rollNo: rollNo || null, 
+        department: "Pending Assignment",
+        role: assignedRole, // 👈 dynamically assigned here!
+        isVerified: false 
+      }
     );
 
     return { userId: newAccount.$id, secret: session.secret };
@@ -51,7 +69,9 @@ export async function signUpUser(formData: FormData) {
   }
 }
 
+// ==========================================
 // SIGN IN LOGIC
+// ==========================================
 export async function signInUser(formData: FormData) {
   const email = (formData.get("email") as string).trim();
   const password = formData.get("password") as string;
@@ -98,7 +118,9 @@ export async function signInUser(formData: FormData) {
   }
 }
 
+// ==========================================
 // GET LOGGED IN USER
+// ==========================================
 export async function getLoggedInUser() {
   try {
     const cookieStore = await cookies();
@@ -114,7 +136,9 @@ export async function getLoggedInUser() {
   }
 }
 
+// ==========================================
 // LOGOUT LOGIC
+// ==========================================
 export async function logoutUser() {
   try {
     const cookieStore = await cookies();

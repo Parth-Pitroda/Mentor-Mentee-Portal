@@ -471,16 +471,21 @@ export async function updateAchievementStatus(achievementId: string, newStatus: 
 // ==========================================
 export async function updateProfileDetails(profileId: string, department: string, skillsString: string) {
   try {
-    // 2. ZOD VALIDATION: Test the incoming data against our strict rules
     const validatedData = ProfileUpdateSchema.safeParse({
       department: department,
       skills: skillsString
     });
 
-    // If it fails, instantly return the exact error message back to the UI
     if (!validatedData.success) {
-      return { success: false, error: validatedData.error.errors[0].message };
+      return { 
+        success: false, 
+        error: validatedData.error.issues[0]?.message || "Invalid input provided." 
+      };
     }
+
+    // Explicitly extract the data so TypeScript stops complaining!
+    const validDepartment = validatedData.data.department;
+    const validSkills = validatedData.data.skills;
 
     const adminClient = new Client()
       .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
@@ -489,7 +494,7 @@ export async function updateProfileDetails(profileId: string, department: string
 
     const databases = new Databases(adminClient);
 
-    const skillsArray = validatedData.data.skills
+    const skillsArray = validSkills
       .split(",")
       .map((skill) => skill.trim())
       .filter((skill) => skill !== "");
@@ -499,7 +504,7 @@ export async function updateProfileDetails(profileId: string, department: string
       process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
       profileId,
       { 
-        department: validatedData.data.department,
+        department: validDepartment,
         skills: skillsArray 
       }
     );
@@ -513,6 +518,7 @@ export async function updateProfileDetails(profileId: string, department: string
     return { success: false, error: "A server error occurred. Please try again." };
   }
 }
+
 // ==========================================
 // 17. Assign Mentor to Student (Admin Action)
 // ==========================================

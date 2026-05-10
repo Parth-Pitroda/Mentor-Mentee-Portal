@@ -2,20 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LogoutButton from "@/components/LogoutButton"; // 1. Import your new button!
 
 export default function Sidebar({ profileId, userName }: { profileId: string, userName: string }) {
   const pathname = usePathname();
-
-  // Helper to check if the link is active
+  
   const isActive = (path: string) => pathname === path;
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-20">
       <div className="p-6 border-b border-slate-100">
-        <h2 className="text-xl font-bold text-blue-900 tracking-tight">PDEU PORTAL</h2>
+        <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2">
+      {/* Added overflow-y-auto so the links can scroll if on a small screen */}
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <Link 
           href={`/dashboard/${profileId}`} 
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
@@ -46,8 +47,7 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
         >
           Academic Records
         </Link>
-        
-        {/* 👇 NEW ACHIEVEMENTS LINK ADDED HERE 👇 */}
+      
         <Link 
           href={`/dashboard/${profileId}/achievements`} 
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
@@ -58,7 +58,6 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
         >
           Achievements
         </Link>
-        {/* 👆 ================================ 👆 */}
 
         <Link 
           href={`/dashboard/${profileId}/profile`} 
@@ -72,12 +71,21 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
         </Link>
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
-         <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs">
-              {userName.charAt(0)}
+     <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+         {/* 1. Your Avatar and Name */}
+         <div className="flex items-center gap-3 px-2 mb-4">
+            <div className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
+              {userName.charAt(0).toUpperCase()}
             </div>
-            <span className="text-sm font-medium text-slate-700 truncate">{userName}</span>
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-sm font-bold text-slate-800 truncate">{userName}</span>
+              <span className="text-xs text-slate-500 font-medium tracking-wide">Mentee Portal</span>
+            </div>
+         </div>
+         
+         {/* 2. THE SIGN OUT BUTTON GOES HERE! */}
+         <div className="px-1">
+            <LogoutButton />
          </div>
       </div>
     </aside>
