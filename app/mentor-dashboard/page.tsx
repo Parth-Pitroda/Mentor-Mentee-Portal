@@ -1,107 +1,112 @@
-import { getAllStudents, toggleStudentVerification } from "@/lib/actions/student.actions";
-import { logoutUser } from "@/lib/actions/auth.actions";
+import { getLoggedInUser } from "@/lib/actions/auth.actions";
+import { getAssignedMentees } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton";
 
-export default async function MentorDashboard() {
-  const students = await getAllStudents();
+export default async function MentorDashboardPage() {
+  // 1. Verify the user is logged in
+  const user = await getLoggedInUser();
+  if (!user) redirect("/sign-in");
 
-  async function handleLogout() {
-    "use server";
-    await logoutUser();
-    redirect("/sign-in");
-  }
+  // 2. Fetch their assigned mentees using their User ID
+  const roster = await getAssignedMentees(user.$id);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Mentor Control Panel</h1>
-            <p className="text-sm text-gray-500">Manage and verify your assigned students.</p>
-          </div>
-          <form action={handleLogout}>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors cursor-pointer">
-              Logout
-            </button>
-          </form>
+    <div className="flex min-h-screen bg-slate-50">
+      
+      {/* SIDEBAR FOR MENTOR */}
+      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-20">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
         </div>
+        <nav className="flex-1 p-4 space-y-2">
+          <Link href="/mentor-dashboard" className="block px-4 py-2 rounded-lg font-medium bg-blue-50 text-blue-700">
+            Mentee Roster
+          </Link>
+          <Link href="/mentor-dashboard/approvals" className="block px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700">
+            Pending Approvals
+          </Link>
+        </nav>
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+           <div className="flex items-center gap-3 px-2 mb-4">
+              <div className="w-9 h-9 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-sm font-bold text-slate-800 truncate">{user.name}</span>
+                <span className="text-xs text-slate-500 font-medium tracking-wide">Faculty Mentor</span>
+              </div>
+           </div>
+           <div className="px-1"><LogoutButton /></div>
+        </div>
+      </aside>
 
-        {/* Student List Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-semibold text-gray-800">Student Directory</h2>
-          </div>
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 ml-64 p-8">
+        <div className="max-w-5xl mx-auto">
           
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-100">
-                  <th className="p-4 font-semibold whitespace-nowrap">Student Name</th>
-                  <th className="p-4 font-semibold whitespace-nowrap">Roll Details</th>
-                  <th className="p-4 font-semibold whitespace-nowrap">Department</th>
-                  <th className="p-4 font-semibold whitespace-nowrap">Status</th>
-                  <th className="p-4 font-semibold text-right whitespace-nowrap">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {students.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-400 italic">
-                      No students found in the database.
-                    </td>
-                  </tr>
-                ) : (
-                  students.map((student: any) => (
-                    <tr key={student.$id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="p-4">
-                        <p className="font-semibold text-gray-900">{student.fullName}</p>
-                        <p className="text-xs text-gray-500">{student.email}</p>
-                      </td>
-                      <td className="p-4 text-sm text-gray-600 font-mono">{student.bio}</td>
-                      <td className="p-4 text-sm text-gray-600">{student.department}</td>
-                      <td className="p-4">
-                        {student.isVerified ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right space-x-2 flex justify-end items-center">
-                        
-                        {/* THE DYNAMIC TOGGLE FORM ACTION */}
-                        <form action={toggleStudentVerification.bind(null, student.$id, student.isVerified)}>
-                          <button 
-                            type="submit" 
-                            className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors cursor-pointer ${
-                              student.isVerified 
-                                ? "bg-red-50 text-red-600 hover:bg-red-100" // Red for Revoke
-                                : "bg-blue-50 text-blue-600 hover:bg-blue-100" // Blue for Verify
-                            }`}
-                          >
-                            {student.isVerified ? "Revoke" : "Verify"}
-                          </button>
-                        </form>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentee Roster</h1>
+            <p className="text-slate-500 mt-1">Manage and track your assigned students for this semester.</p>
+          </div>
 
-                        <Link href={`/dashboard/${student.$id}`} className="text-xs bg-gray-100 text-gray-600 font-semibold px-3 py-1.5 rounded hover:bg-gray-200 transition-colors">
-                          View
-                        </Link>
+          {/* THE DATA TABLE */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">Student Name</th>
+                    <th className="px-6 py-4">Roll Number</th>
+                    <th className="px-6 py-4">Department</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {roster.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                        No students have been assigned to you yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    roster.map((student: any) => (
+                      <tr key={student.$id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-800">{student.fullName}</td>
+                        <td className="px-6 py-4">{student.rollNo || "N/A"}</td>
+                        <td className="px-6 py-4">{student.department}</td>
+                        <td className="px-6 py-4">
+                          {student.isVerified ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                              Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">
+                              Pending Setup
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {/* Clicking this lets the mentor jump straight into the student's dashboard! */}
+                          <Link 
+                            href={`/dashboard/${student.$id}`}
+                            className="text-blue-600 font-bold hover:text-blue-800 hover:underline"
+                          >
+                            View Profile &rarr;
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

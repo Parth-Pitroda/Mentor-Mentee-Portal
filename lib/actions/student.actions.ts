@@ -607,3 +607,89 @@ export async function bulkImportStudents(studentList: Array<{ fullName: string, 
     return { success: false, error: error.message };
   }
 }
+
+// ==========================================
+// 19. Fetch Assigned Mentees (For Mentor Dashboard)
+// ==========================================
+export async function getAssignedMentees(mentorId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Query the profiles collection to find all students who have this mentor's ID
+    const rosterList = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [
+        Query.equal("mentorId", [mentorId]),
+        Query.equal("role", ["mentee"]),
+        Query.orderDesc("$createdAt")
+      ]
+    );
+
+    return JSON.parse(JSON.stringify(rosterList.documents));
+  } catch (error) {
+    console.error("Failed to fetch mentor roster:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 20. Fetch Pending Approvals (For Mentor Dashboard)
+// ==========================================
+export async function getPendingApprovals(mentorId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // 1. Get all mentees assigned to this mentor
+    const menteesList = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("mentorId", [mentorId])]
+    );
+
+    if (menteesList.total === 0) return { meetings: [] };
+
+    // 2. Map their IDs and Names so we know WHO submitted the request
+    const menteeIds: string[] = [];
+    const studentMap: Record<string, string> = {};
+    
+    menteesList.documents.forEach((doc) => {
+      menteeIds.push(doc.$id);
+      studentMap[doc.$id] = doc.fullName;
+    });
+
+    // 3. Fetch all "Pending" Meetings for these specific students
+    const pendingMeetings = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", menteeIds),
+        Query.equal("status", ["Pending"]),
+        Query.orderDesc("$createdAt")
+      ]
+    );
+
+    // 4. Attach the student's name to each meeting request
+    const meetings = pendingMeetings.documents.map((meeting) => ({
+      ...meeting,
+      studentName: studentMap[meeting.studentId] || "Unknown Student"
+    }));
+
+    // (You can replicate step 3 for academics and achievements later!)
+    return JSON.parse(JSON.stringify({ meetings }));
+
+  } catch (error) {
+    console.error("Failed to fetch pending approvals:", error);
+    return { meetings: [] };
+  }
+}
