@@ -21,9 +21,11 @@ export default async function MentorDashboardPage() {
           <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
         </div>
         <nav className="flex-1 p-4 space-y-2">
+          {/* Active State for Roster Tab */}
           <Link href="/mentor-dashboard" className="block px-4 py-2 rounded-lg font-medium bg-blue-50 text-blue-700">
             Mentee Roster
           </Link>
+          {/* Inactive State for Approvals Tab */}
           <Link href="/mentor-dashboard/approvals" className="block px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700">
             Pending Approvals
           </Link>
@@ -89,9 +91,9 @@ export default async function MentorDashboardPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          {/* Clicking this lets the mentor jump straight into the student's dashboard! */}
+                          {/* Updated link to point to the Master Verification page! */}
                           <Link 
-                            href={`/dashboard/${student.$id}`}
+                            href={`/mentor-dashboard/student/${student.$id}`}
                             className="text-blue-600 font-bold hover:text-blue-800 hover:underline"
                           >
                             View Profile &rarr;

@@ -111,30 +111,6 @@ export async function getAllStudents() {
 }
 
 // ==========================================
-// 5. Toggle Student Verification (Mentor Action)
-// ==========================================
-export async function toggleStudentVerification(studentId: string, currentStatus: boolean) {
-  try {
-    // Flip the status to the opposite of whatever it currently is
-    await databases.updateDocument(
-      DATABASE_ID,
-      PROFILES_COLLECTION,
-      studentId,
-      {
-        isVerified: !currentStatus 
-      }
-    );
-
-    // Tell Next.js to clear its cache and instantly refresh the mentor dashboard!
-    revalidatePath("/mentor-dashboard");
-    
-    return JSON.parse(JSON.stringify({ success: true }));
-  } catch (error) {
-    console.error("Failed to toggle verification:", error);
-    return JSON.parse(JSON.stringify({ success: false }));
-  }
-}
-// ==========================================
 // 6. Fetch Achievements
 // ==========================================
 export async function getAchievements(studentId: string) {
@@ -641,6 +617,9 @@ export async function getAssignedMentees(mentorId: string) {
 // ==========================================
 // 20. Fetch Pending Approvals (For Mentor Dashboard)
 // ==========================================
+// ==========================================
+// 20. Fetch ALL Pending Approvals (Meetings, Academics, Achievements)
+// ==========================================
 export async function getPendingApprovals(mentorId: string) {
   try {
     const adminClient = new Client()
@@ -657,7 +636,7 @@ export async function getPendingApprovals(mentorId: string) {
       [Query.equal("mentorId", [mentorId])]
     );
 
-    if (menteesList.total === 0) return { meetings: [] };
+    if (menteesList.total === 0) return { meetings: [], academics: [], achievements: [] };
 
     // 2. Map their IDs and Names so we know WHO submitted the request
     const menteeIds: string[] = [];
@@ -668,28 +647,73 @@ export async function getPendingApprovals(mentorId: string) {
       studentMap[doc.$id] = doc.fullName;
     });
 
-    // 3. Fetch all "Pending" Meetings for these specific students
-    const pendingMeetings = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-      [
-        Query.equal("studentId", menteeIds),
-        Query.equal("status", ["Pending"]),
-        Query.orderDesc("$createdAt")
-      ]
-    );
+    // 3. Fetch ALL pending requests across all three collections simultaneously using Promise.all
+    const [pendingMeetings, pendingAcademics, pendingAchievements] = await Promise.all([
+      databases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+      ),
+      databases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+      ),
+      databases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+      )
+    ]);
 
-    // 4. Attach the student's name to each meeting request
-    const meetings = pendingMeetings.documents.map((meeting) => ({
-      ...meeting,
-      studentName: studentMap[meeting.studentId] || "Unknown Student"
+    // 4. Attach the student's name to the requests
+    const mapWithNames = (docs: any[]) => docs.map(doc => ({
+      ...doc,
+      studentName: studentMap[doc.studentId] || "Unknown Student"
     }));
 
-    // (You can replicate step 3 for academics and achievements later!)
-    return JSON.parse(JSON.stringify({ meetings }));
+    return JSON.parse(JSON.stringify({ 
+      meetings: mapWithNames(pendingMeetings.documents),
+      academics: mapWithNames(pendingAcademics.documents),
+      achievements: mapWithNames(pendingAchievements.documents)
+    }));
 
   } catch (error) {
     console.error("Failed to fetch pending approvals:", error);
-    return { meetings: [] };
+    return { meetings: [], academics: [], achievements: [] };
+  }
+}
+
+// ==========================================
+// 21. Master Verification Toggle
+// ==========================================
+
+export async function toggleStudentVerification(studentId: string, currentStatus: boolean) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Flip the status to the opposite of what it currently is
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId,
+      {
+        isVerified: !currentStatus
+      }
+    );
+
+    // Tell Next.js to refresh the mentor pages so the UI updates instantly
+    revalidatePath("/mentor-dashboard");
+    revalidatePath(`/mentor-dashboard/student/${studentId}`);
+    
+    return JSON.parse(JSON.stringify({ success: true }));
+  } catch (error: any) {
+    console.error("Failed to toggle verification:", error);
+    return JSON.parse(JSON.stringify({ error: error.message }));
   }
 }
