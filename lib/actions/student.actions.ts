@@ -717,3 +717,135 @@ export async function toggleStudentVerification(studentId: string, currentStatus
     return JSON.parse(JSON.stringify({ error: error.message }));
   }
 }
+
+// ==========================================
+// 22. Get System Analytics (Admin Dashboard)
+// ==========================================
+export async function getSystemAnalytics() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+
+    // We use Promise.all to fetch all the counts simultaneously for maximum speed!
+    const [mentees, verifiedMentees, meetings] = await Promise.all([
+      databases.listDocuments(
+        DATABASE_ID,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        [Query.equal("role", ["mentee"])]
+      ),
+      databases.listDocuments(
+        DATABASE_ID,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        [Query.equal("role", ["mentee"]), Query.equal("isVerified", [true])]
+      ),
+      databases.listDocuments(
+        DATABASE_ID,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!
+      )
+    ]);
+
+    return {
+      totalStudents: mentees.total,
+      verifiedStudents: verifiedMentees.total,
+      pendingVerifications: mentees.total - verifiedMentees.total,
+      totalMeetings: meetings.total
+    };
+  } catch (error) {
+    console.error("Failed to fetch analytics:", error);
+    return { totalStudents: 0, verifiedStudents: 0, pendingVerifications: 0, totalMeetings: 0 };
+  }
+}
+
+// ==========================================
+// 23. Create Global Notice (Admin)
+// ==========================================
+export async function createGlobalNotice(formData: FormData) {
+  try {
+    const title = formData.get("title") as string;
+    const content = formData.get("content") as string;
+
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    await databases.createDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!, 
+      ID.unique(),
+      { title, content }
+    );
+
+    revalidatePath("/admin-dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to post notice:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 24. Fetch All Mentors (Admin)
+// ==========================================
+export async function getAllMentors() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const mentors = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("role", ["mentor"]), Query.orderDesc("$createdAt")]
+    );
+
+    return JSON.parse(JSON.stringify(mentors.documents));
+  } catch (error) {
+    console.error("Failed to fetch mentors:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 25. Get Verified Data for Export (Admin)
+// ==========================================
+export async function getVerifiedStudentsForExport() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const students = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("role", ["mentee"]), Query.equal("isVerified", [true])]
+    );
+
+    // We only return the specific fields we want the University office to see
+    const cleanData = students.documents.map((student) => ({
+      FullName: student.fullName,
+      RollNumber: student.rollNo || "N/A",
+      Email: student.email,
+      Department: student.department,
+      CurrentSemester: student.currentSemester || "N/A"
+    }));
+
+    return JSON.parse(JSON.stringify(cleanData));
+  } catch (error) {
+    console.error("Export failed:", error);
+    return [];
+  }
+}
