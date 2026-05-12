@@ -8,7 +8,10 @@ import {
   getAllProfiles,
   getGlobalSettings,
   updateGlobalSettings,
-  getDepartmentAnalytics
+  getDepartmentAnalytics,
+  getUnassignedStudents,
+  assignMentorToStudent,
+  importStudentsFromCSV
 } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -32,6 +35,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
   const allProfiles = await getAllProfiles();
   const systemSettings = await getGlobalSettings();
   const deptData = await getDepartmentAnalytics();
+  const unassignedStudents = await getUnassignedStudents();
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -147,22 +151,38 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
             </div>
           )}
 
-          {/* ================= TAB 2: ASSIGNMENTS ================= */}
+         {/* ================= TAB 2: ASSIGNMENTS ================= */}
           {activeTab === 'assignments' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+               
+               {/* BULK IMPORT CARD */}
                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-800 mb-2">Bulk Student Import</h2>
                   <p className="text-sm text-slate-500 mb-6">Upload a CSV file with columns: <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-700">FullName, Email, Department</span></p>
-                  <form className="flex items-center gap-4">
-                    <input type="file" name="file" accept=".csv" className="block w-full max-w-md text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-lg"/>
-                    <button type="submit" className="px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 shadow-sm whitespace-nowrap">Upload CSV</button>
+                  <form action={async (formData) => {
+                    "use server";
+                    await importStudentsFromCSV(formData);
+                    redirect("/admin-dashboard?tab=assignments"); // Stay on the assignments tab!
+                  }} className="flex items-center gap-4">
+                    <input 
+                      type="file" 
+                      name="file" 
+                      accept=".csv"
+                      required 
+                      className="block w-full max-w-md text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-lg"
+                    />
+                    <button type="submit" className="px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 shadow-sm whitespace-nowrap">
+                      Upload CSV
+                    </button>
                   </form>
                 </div>
+
+                {/* PENDING ASSIGNMENTS TABLE */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800">Pending Assignments</h2>
                     <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-3 py-1 rounded-full border border-yellow-200">
-                      Unassigned Queue
+                      {unassignedStudents?.length || 0} Students Pending
                     </span>
                   </div>
                   <div className="overflow-x-auto">
@@ -175,22 +195,51 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        <tr className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <p className="font-bold text-slate-800">Rahul Sharma</p>
-                            <p className="text-xs text-slate-500">rahul.s@sot.pdpu.ac.in</p>
-                          </td>
-                          <td className="px-6 py-4 font-medium text-slate-700">Mechanical Engineering</td>
-                          <td className="px-6 py-4">
-                            <form className="flex items-center gap-2">
-                              <select name="mentorId" className="w-full max-w-[250px] p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="">Select a Mentor...</option>
-                                <option value="mentor1">Dr. HirenKumar Thakkar</option>
-                              </select>
-                              <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm">Assign</button>
-                            </form>
-                          </td>
-                        </tr>
+                        
+                        {(!unassignedStudents || unassignedStudents.length === 0) ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-12 text-center text-slate-500 font-medium">
+                              All students have been assigned to mentors! 🎉
+                            </td>
+                          </tr>
+                        ) : (
+                          unassignedStudents.map((student: any) => (
+                            <tr key={student.$id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <p className="font-bold text-slate-800">{student.fullName}</p>
+                                <p className="text-xs text-slate-500">{student.email}</p>
+                              </td>
+                              <td className="px-6 py-4 font-medium text-slate-700">{student.department || "N/A"}</td>
+                              <td className="px-6 py-4">
+                                
+                                {/* ==== THE DYNAMIC FORM (FIXED REDIRECT) ==== */}
+                                <form action={async (formData) => {
+                                  "use server";
+                                  await assignMentorToStudent(student.$id, formData);
+                                  redirect("/admin-dashboard?tab=assignments"); // Forces it to stay on this tab!
+                                }} 
+                                className="flex items-center gap-2">
+                                  <select 
+                                    name="mentorId" 
+                                    required
+                                    className="w-full max-w-[250px] p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                                  >
+                                    <option value="">Select a Mentor...</option>
+                                    {mentors?.map((mentor: any) => (
+                                      <option key={mentor.$id} value={mentor.$id}>
+                                        {mentor.fullName} ({mentor.department || "Faculty"})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap">
+                                    Assign
+                                  </button>
+                                </form>
+
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -285,7 +334,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-xl">⚙️</div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-800">Global Configuration</h2>
-                    <p className="text-sm text-slate-500">Update the current active semester for all users.</p>
+                    <p className="text-sm text-slate-500">Update the current active university term for all users.</p>
                   </div>
                 </div>
 
@@ -296,12 +345,12 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Current Semester</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Active Term</label>
                       <input 
                         type="text" 
-                        name="currentSemester" 
-                        defaultValue={systemSettings.currentSemester} 
-                        placeholder="e.g., Fall 2026 or Semester 5"
+                        name="activeTerm" 
+                        defaultValue={systemSettings.activeTerm || systemSettings.currentSemester} 
+                        placeholder="e.g., Odd Semesters (July-Dec)"
                         required 
                         className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
                       />
@@ -320,7 +369,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                   </div>
 
                   <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl border border-blue-100">
-                    <strong>Note:</strong> Saving these changes will instantly update the "Current Semester" display on all student and mentor dashboards system-wide.
+                    <strong>Note:</strong> Saving these changes will instantly update the active term display on all student and mentor dashboards system-wide.
                   </div>
 
                   <button type="submit" className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition-all w-full md:w-auto">

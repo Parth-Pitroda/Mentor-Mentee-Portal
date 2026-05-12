@@ -19,7 +19,14 @@ export default function DepartmentChart({ data }: { data: any[] }) {
           margin={{ top: 20, right: 30, left: -20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-          <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+          <XAxis 
+            dataKey="name" 
+            stroke="#64748b" 
+            fontSize={11} 
+            tickLine={false} 
+            axisLine={false} 
+            tickFormatter={(value) => value === 'Information & Communication Tech' ? 'ICT' : value}
+          />
           <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
           <Tooltip
             cursor={{ fill: '#f8fafc' }}

@@ -1017,3 +1017,118 @@ export async function getDepartmentAnalytics() {
     return [];
   }
 }
+
+// ==========================================
+// 31. Get Unassigned Students (Admin)
+// ==========================================
+export async function getUnassignedStudents() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Fetch all mentees
+    const mentees = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("role", ["mentee"]), Query.orderDesc("$createdAt")]
+    );
+
+    // Filter to only return students who do NOT have a mentorId
+    const unassigned = mentees.documents.filter(
+      (student) => !student.mentorId || student.mentorId === ""
+    );
+
+    return JSON.parse(JSON.stringify(unassigned));
+  } catch (error) {
+    console.error("Failed to fetch unassigned students:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 32. Assign Mentor to Student (Admin)
+// ==========================================
+export async function assignMentorToStudent(studentId: string, formData: FormData) {
+  try {
+    const mentorId = formData.get("mentorId") as string;
+    
+    if (!mentorId) throw new Error("Please select a mentor.");
+
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Update the student's profile with the new mentorId
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId,
+      { mentorId: mentorId }
+    );
+
+    revalidatePath("/admin-dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to assign mentor:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 33. Bulk Import Students from CSV (Admin)
+// ==========================================
+export async function importStudentsFromCSV(formData: FormData) {
+  try {
+    const file = formData.get("file") as File;
+    if (!file || file.size === 0) throw new Error("Please select a valid CSV file.");
+
+    // Read the file content as text
+    const text = await file.text();
+    
+    // Split the text into an array of lines, ignoring empty rows
+    const lines = text.split("\n").filter(line => line.trim() !== "");
+
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Loop through all lines EXCEPT the first one (which contains the headers)
+    for (let i = 1; i < lines.length; i++) {
+      // Split each row by commas: [FullName, Email, Department]
+      const [fullName, email, department] = lines[i].split(",").map(item => item.trim());
+
+      // Skip invalid rows
+      if (!fullName || !email) continue;
+
+      // Create the student document in Appwrite
+      await databases.createDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, // Ensure this matches your collection ID variable
+        ID.unique(),
+        {
+          fullName: fullName,
+          email: email,
+          department: department || "Unassigned",
+          role: "mentee",
+          isVerified: true, // Automatically verify students imported by the Admin
+        }
+      );
+    }
+
+    revalidatePath("/admin-dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to import CSV:", error);
+    return { success: false, error: error.message };
+  }
+}
