@@ -901,3 +901,119 @@ export async function deleteUserProfile(profileId: string) {
     return { success: false, error: error.message };
   }
 }
+
+// ==========================================
+// 28. Get Global Settings (Admin)
+// ==========================================
+export async function getGlobalSettings() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+    const SETTINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!;
+
+    const settingsList = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      SETTINGS_COLLECTION,
+      [Query.limit(1)] // We only ever need the single master settings document
+    );
+
+    // If no settings exist yet, create a default one automatically!
+    if (settingsList.total === 0) {
+      const defaultSettings = await databases.createDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        SETTINGS_COLLECTION,
+        ID.unique(),
+        { activeTerm: "Odd Semesters (July-Dec)", academicYear: "2026-2027" }
+      );
+      return JSON.parse(JSON.stringify(defaultSettings));
+    }
+
+    return JSON.parse(JSON.stringify(settingsList.documents[0]));
+  } catch (error) {
+    console.error("Failed to fetch settings:", error);
+    return null;
+  }
+}
+
+// ==========================================
+// 29. Update Global Settings (Admin)
+// ==========================================
+export async function updateGlobalSettings(settingsId: string, formData: FormData) {
+  try {
+    const activeTerm = formData.get("activeTerm") as string;
+    const academicYear = formData.get("academicYear") as string;
+
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
+      settingsId,
+      { activeTerm, academicYear }
+    );
+
+    revalidatePath("/admin-dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to update settings:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 30. Get Department Analytics (Admin)
+// ==========================================
+export async function getDepartmentAnalytics() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Fetch all mentees
+    const profiles = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("role", ["mentee"])]
+    );
+
+    // Group the data by department
+    const deptStats: Record<string, { total: number; verified: number }> = {};
+
+    profiles.documents.forEach((student) => {
+      const dept = student.department || "Unassigned";
+      
+      if (!deptStats[dept]) {
+        deptStats[dept] = { total: 0, verified: 0 };
+      }
+      
+      deptStats[dept].total += 1;
+      if (student.isVerified) {
+        deptStats[dept].verified += 1;
+      }
+    });
+
+    // Format the data specifically for our Chart library
+    const chartData = Object.keys(deptStats).map((dept) => ({
+      name: dept,
+      Total: deptStats[dept].total,
+      Verified: deptStats[dept].verified,
+    }));
+
+    return chartData;
+  } catch (error) {
+    console.error("Failed to fetch department analytics:", error);
+    return [];
+  }
+}

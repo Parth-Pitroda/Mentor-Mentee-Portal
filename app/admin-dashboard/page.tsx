@@ -6,13 +6,15 @@ import {
   createGlobalNotice,
   getVerifiedStudentsForExport,
   getAllProfiles,
-  deleteUserProfile
+  getGlobalSettings,
+  updateGlobalSettings,
+  getDepartmentAnalytics
 } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import DepartmentChart from "@/components/DepartmentChart";
 import LogoutButton from "@/components/LogoutButton";
 import ExportCSVButton from "@/components/ExportCSVButton";
-import DeleteUserButton from "@/components/DeleteUserButton";
 import UserManagementTable from "@/components/UserManagementTable";
 
 export default async function AdminDashboardPage(props: { searchParams: Promise<{ tab?: string }> }) {
@@ -28,6 +30,8 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
   const notices = await getLatestNotices(5);
   const exportData = await getVerifiedStudentsForExport();
   const allProfiles = await getAllProfiles();
+  const systemSettings = await getGlobalSettings();
+  const deptData = await getDepartmentAnalytics();
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -41,17 +45,25 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
           {/* Main Dashboard Link */}
           <Link 
             href="/admin-dashboard" 
-            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab !== 'users' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+            className={`block px-4 py-2 rounded-lg font-medium transition-all ${!['users', 'settings'].includes(activeTab) ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
           >
             System Dashboard
           </Link>
           
-          {/* User Management Link (Moved here!) */}
+          {/* User Management Link */}
           <Link 
             href="?tab=users" 
             className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'users' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
           >
             User Management
+          </Link>
+
+          {/* System Settings Link */}
+          <Link 
+            href="?tab=settings" 
+            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+          >
+            System Settings
           </Link>
         </nav>
         
@@ -76,17 +88,19 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
           {/* DYNAMIC HEADER */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-              {activeTab === 'users' ? 'User Management' : 'System Dashboard'}
+              {activeTab === 'users' ? 'User Management' : activeTab === 'settings' ? 'System Settings' : 'System Dashboard'}
             </h1>
             <p className="text-slate-500 mt-1">
               {activeTab === 'users' 
                 ? 'Manage all platform accounts, roles, and access.' 
+                : activeTab === 'settings'
+                ? 'Configure global variables and system-wide parameters.'
                 : 'Manage institutional data and coordinate faculty-student relations.'}
             </p>
           </div>
 
-          {/* ================= 5-PILL NAVIGATION TABS (Hides on User Management) ================= */}
-          {activeTab !== 'users' && (
+          {/* ================= 5-PILL NAVIGATION TABS (Hides on Sidebar Tabs) ================= */}
+          {!['users', 'settings'].includes(activeTab) && (
             <div className="flex flex-wrap gap-2 bg-slate-200/50 p-1.5 rounded-xl mb-8 border border-slate-200 shadow-sm w-fit">
               <Link href="?tab=overview" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Overview</Link>
               <Link href="?tab=assignments" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'assignments' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Assignments</Link>
@@ -122,6 +136,13 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Meetings Logged</p>
                   <p className="text-3xl font-extrabold text-slate-800">{analytics.totalMeetings}</p>
                 </div>
+              </div>
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-slate-800">Verification by Department</h3>
+                  <p className="text-sm text-slate-500">Track onboarding progress across different engineering branches.</p>
+                </div>
+                <DepartmentChart data={deptData} />
               </div>
             </div>
           )}
@@ -252,7 +273,61 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
           {/* ================= TAB 6: USER MANAGEMENT (God Mode) ================= */}
           {activeTab === 'users' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <UserManagementTable profiles={allProfiles} />
+               <UserManagementTable profiles={allProfiles} />
+            </div>
+          )}
+
+          {/* ================= TAB 7: SYSTEM SETTINGS ================= */}
+          {activeTab === 'settings' && systemSettings && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-2xl">
+                <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-xl">⚙️</div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">Global Configuration</h2>
+                    <p className="text-sm text-slate-500">Update the current active semester for all users.</p>
+                  </div>
+                </div>
+
+                <form action={async (formData) => {
+                  "use server";
+                  await updateGlobalSettings(systemSettings.$id, formData);
+                }} className="space-y-6">
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Current Semester</label>
+                      <input 
+                        type="text" 
+                        name="currentSemester" 
+                        defaultValue={systemSettings.currentSemester} 
+                        placeholder="e.g., Fall 2026 or Semester 5"
+                        required 
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Academic Year</label>
+                      <input 
+                        type="text" 
+                        name="academicYear" 
+                        defaultValue={systemSettings.academicYear} 
+                        placeholder="e.g., 2026-2027"
+                        required 
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl border border-blue-100">
+                    <strong>Note:</strong> Saving these changes will instantly update the "Current Semester" display on all student and mentor dashboards system-wide.
+                  </div>
+
+                  <button type="submit" className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition-all w-full md:w-auto">
+                    Save Global Settings
+                  </button>
+                </form>
+              </div>
             </div>
           )}
 
