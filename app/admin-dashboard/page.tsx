@@ -4,12 +4,16 @@ import {
   getAllMentors, 
   getLatestNotices, 
   createGlobalNotice,
-  getVerifiedStudentsForExport 
+  getVerifiedStudentsForExport,
+  getAllProfiles,
+  deleteUserProfile
 } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import ExportCSVButton from "@/components/ExportCSVButton";
+import DeleteUserButton from "@/components/DeleteUserButton";
+import UserManagementTable from "@/components/UserManagementTable";
 
 export default async function AdminDashboardPage(props: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await props.searchParams;
@@ -23,6 +27,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
   const mentors = await getAllMentors();
   const notices = await getLatestNotices(5);
   const exportData = await getVerifiedStudentsForExport();
+  const allProfiles = await getAllProfiles();
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -33,10 +38,23 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
           <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <Link href="/admin-dashboard" className="block px-4 py-2 rounded-lg font-medium bg-blue-50 text-blue-700">
+          {/* Main Dashboard Link */}
+          <Link 
+            href="/admin-dashboard" 
+            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab !== 'users' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+          >
             System Dashboard
           </Link>
+          
+          {/* User Management Link (Moved here!) */}
+          <Link 
+            href="?tab=users" 
+            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'users' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+          >
+            User Management
+          </Link>
         </nav>
+        
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
            <div className="flex items-center gap-3 px-2 mb-4">
               <div className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
@@ -55,19 +73,28 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
       <main className="flex-1 ml-64 p-8">
         <div className="max-w-5xl mx-auto">
           
+          {/* DYNAMIC HEADER */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">System Dashboard</h1>
-            <p className="text-slate-500 mt-1">Manage institutional data and coordinate faculty-student relations.</p>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              {activeTab === 'users' ? 'User Management' : 'System Dashboard'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {activeTab === 'users' 
+                ? 'Manage all platform accounts, roles, and access.' 
+                : 'Manage institutional data and coordinate faculty-student relations.'}
+            </p>
           </div>
 
-          {/* ================= 5-PILL NAVIGATION TABS ================= */}
-          <div className="flex flex-wrap gap-2 bg-slate-200/50 p-1.5 rounded-xl mb-8 border border-slate-200 shadow-sm w-fit">
-            <Link href="?tab=overview" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Overview</Link>
-            <Link href="?tab=assignments" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'assignments' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Assignments</Link>
-            <Link href="?tab=notices" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Notices</Link>
-            <Link href="?tab=faculty" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'faculty' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Faculty</Link>
-            <Link href="?tab=export" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'export' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Data Export</Link>
-          </div>
+          {/* ================= 5-PILL NAVIGATION TABS (Hides on User Management) ================= */}
+          {activeTab !== 'users' && (
+            <div className="flex flex-wrap gap-2 bg-slate-200/50 p-1.5 rounded-xl mb-8 border border-slate-200 shadow-sm w-fit">
+              <Link href="?tab=overview" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Overview</Link>
+              <Link href="?tab=assignments" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'assignments' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Assignments</Link>
+              <Link href="?tab=notices" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Notices</Link>
+              <Link href="?tab=faculty" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'faculty' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Faculty</Link>
+              <Link href="?tab=export" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'export' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Data Export</Link>
+            </div>
+          )}
 
           {/* ================= TAB 1: OVERVIEW ================= */}
           {activeTab === 'overview' && (
@@ -99,7 +126,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
             </div>
           )}
 
-          {/* ================= TAB 2: ASSIGNMENTS (Your Existing UI) ================= */}
+          {/* ================= TAB 2: ASSIGNMENTS ================= */}
           {activeTab === 'assignments' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8">
@@ -110,7 +137,43 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                     <button type="submit" className="px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 shadow-sm whitespace-nowrap">Upload CSV</button>
                   </form>
                 </div>
-                {/* Add your table logic back here when ready! */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-800">Pending Assignments</h2>
+                    <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-3 py-1 rounded-full border border-yellow-200">
+                      Unassigned Queue
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-slate-600">
+                      <thead className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold tracking-wider">
+                        <tr>
+                          <th className="px-6 py-4">Student Info</th>
+                          <th className="px-6 py-4">Department</th>
+                          <th className="px-6 py-4">Assign Mentor</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-800">Rahul Sharma</p>
+                            <p className="text-xs text-slate-500">rahul.s@sot.pdpu.ac.in</p>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-700">Mechanical Engineering</td>
+                          <td className="px-6 py-4">
+                            <form className="flex items-center gap-2">
+                              <select name="mentorId" className="w-full max-w-[250px] p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">Select a Mentor...</option>
+                                <option value="mentor1">Dr. HirenKumar Thakkar</option>
+                              </select>
+                              <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm">Assign</button>
+                            </form>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
             </div>
           )}
 
@@ -119,7 +182,7 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-lg font-bold text-slate-800 mb-4">Broadcast New Notice</h2>
-                <form action={createGlobalNotice} className="space-y-4">
+                <form action={async (formData) => { "use server"; await createGlobalNotice(formData); }} className="space-y-4">
                   <input type="text" name="title" placeholder="Notice Title (e.g., Final Marks Submission)" required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
                   <textarea name="content" placeholder="Type your broadcast message here..." rows={3} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
                   <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-sm">Publish Notice</button>
@@ -179,11 +242,17 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
                 <h2 className="text-2xl font-bold text-slate-800 mb-2">Master Roster Export</h2>
                 <p className="text-slate-500 mb-8">Download a standardized CSV file of all officially verified students. This file is formatted for delivery to the University Administration office.</p>
                 <div className="flex justify-center">
-                  {/* The Client Component we built in Step 2! */}
                   <ExportCSVButton data={exportData} />
                 </div>
                 <p className="text-xs text-slate-400 mt-4">Contains {exportData.length} verified records.</p>
               </div>
+            </div>
+          )}
+
+          {/* ================= TAB 6: USER MANAGEMENT (God Mode) ================= */}
+          {activeTab === 'users' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <UserManagementTable profiles={allProfiles} />
             </div>
           )}
 

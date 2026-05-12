@@ -849,3 +849,55 @@ export async function getVerifiedStudentsForExport() {
     return [];
   }
 }
+
+// ==========================================
+// 26. Fetch ALL Users for Management (Admin)
+// ==========================================
+export async function getAllProfiles() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const profiles = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.orderDesc("$createdAt")] // Gets everyone!
+    );
+
+    return JSON.parse(JSON.stringify(profiles.documents));
+  } catch (error) {
+    console.error("Failed to fetch all profiles:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 27. Delete User Profile (Admin Action)
+// ==========================================
+export async function deleteUserProfile(profileId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // Completely remove the profile from the database
+    await databases.deleteDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      profileId
+    );
+
+    revalidatePath("/admin-dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to delete profile:", error);
+    return { success: false, error: error.message };
+  }
+}
