@@ -1070,7 +1070,10 @@ export async function assignMentorToStudent(studentId: string, formData: FormDat
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
       studentId,
-      { mentorId: mentorId }
+      { 
+        mentorId: mentorId,
+        isVerified: true
+      }
     );
 
     revalidatePath("/admin-dashboard");
@@ -1129,6 +1132,325 @@ export async function importStudentsFromCSV(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to import CSV:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 34. Get System Activity Logs (Admin)
+// ==========================================
+export async function getSystemActivityLog() {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    // 1. Fetch latest notices
+    const noticesList = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTICES_ID!, // Ensure this matches your notices collection ID
+      [Query.orderDesc("$createdAt"), Query.limit(3)]
+    );
+
+    // 2. Fetch latest student profiles
+    const profilesList = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.orderDesc("$createdAt"), Query.limit(4)]
+    );
+
+    // 3. Format and merge them into a single timeline array
+    const logs: any[] = [];
+
+    noticesList.documents.forEach((notice) => {
+      logs.push({
+        id: notice.$id,
+        type: "notice",
+        message: `Global Notice published: "${notice.title}"`,
+        timestamp: new Date(notice.$createdAt),
+        icon: "📢",
+        color: "bg-blue-100 text-blue-600"
+      });
+    });
+
+    profilesList.documents.forEach((profile) => {
+      logs.push({
+        id: profile.$id,
+        type: "user",
+        message: profile.mentorId 
+          ? `${profile.fullName} was assigned a mentor.` 
+          : `New student account created: ${profile.fullName}`,
+        timestamp: new Date(profile.$createdAt),
+        icon: profile.mentorId ? "🤝" : "👤",
+        color: profile.mentorId ? "bg-purple-100 text-purple-600" : "bg-green-100 text-green-600"
+      });
+    });
+
+    // Sort the combined logs from newest to oldest
+    logs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    // Return the top 5 most recent activities
+    return JSON.parse(JSON.stringify(logs.slice(0, 5)));
+  } catch (error) {
+    console.error("Failed to fetch activity logs:", error);
+    return [];
+  }
+}
+// ==========================================
+// 35. Get Mentor's Specific Roster
+// ==========================================
+export async function getMentorRoster(mentorId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const mentees = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [
+        Query.equal("role", ["mentee"]),
+        Query.equal("mentorId", mentorId), // Only fetch students assigned to THIS mentor
+        Query.orderDesc("$createdAt"),
+        Query.limit(100) // 🚨 ADDED THIS LINE: Forces Appwrite to send up to 100 students!
+      ]
+    );
+
+    return JSON.parse(JSON.stringify(mentees.documents));
+  } catch (error) {
+    console.error("Failed to fetch mentor roster:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 36. Complete Mentee Onboarding (With Profile Pic)
+// ==========================================
+export async function completeMenteeOnboarding(userId: string, formData: FormData) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+    const storage = new Storage(adminClient); // Need the storage service!
+
+    let profilePictureId = null;
+
+    // 1. Process and upload the image if it exists
+    const file = formData.get("profilePicture") as File | null;
+    if (file && file.size > 0 && file.name !== "undefined") {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
+
+      const uploadedFile = await storage.createFile(
+        process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID!,
+        ID.unique(),
+        appwriteInputFile
+      );
+      profilePictureId = uploadedFile.$id;
+    }
+
+    // 2. Package the text data
+    const updateData: any = {
+      department: formData.get("department"),
+      phone: formData.get("phone"),
+      bloodGroup: formData.get("bloodGroup"),
+      residentialStatus: formData.get("residentialStatus"),
+      semester: formData.get("semester"),
+      cgpa: formData.get("cgpa"),
+      backlogs: formData.get("backlogs"),
+      interests: formData.get("interests"),
+      fatherName: formData.get("fatherName"),
+      fatherOccupation: formData.get("fatherOccupation"),
+      fatherPhone: formData.get("fatherPhone"),
+      fatherEmail: formData.get("fatherEmail"),
+      motherName: formData.get("motherName"),
+      motherOccupation: formData.get("motherOccupation"),
+      motherPhone: formData.get("motherPhone"),
+      motherEmail: formData.get("motherEmail"),
+    };
+
+    // 3. Add the picture ID if we successfully uploaded one
+    if (profilePictureId) {
+      updateData.profilePictureId = profilePictureId;
+    }
+
+    // 4. Save to the database
+    await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      userId,
+      updateData
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to save onboarding data:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 37. Get Full Student Profile
+// ==========================================
+export async function getMenteeProfile(userId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const profile = await databases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      userId
+    );
+
+    return JSON.parse(JSON.stringify(profile));
+  } catch (error) {
+    console.error("Failed to fetch student profile:", error);
+    return null;
+  }
+}
+
+// ==========================================
+// 38. Exact-Match Advisory Import (Admin)
+// ==========================================
+export async function importMasterAdvisoryList(formData: FormData) {
+  try {
+    const file = formData.get("file") as File;
+    if (!file || file.size === 0) throw new Error("Please select a valid CSV file.");
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/); // Split by row
+
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+    const users = new Users(adminClient);
+
+    // 1. Fetch all Mentors currently in the database to match against
+    const mentorsResponse = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("role", ["mentor"])]
+    );
+    const allMentors = mentorsResponse.documents;
+
+    let successCount = 0;
+    let errors: string[] = [];
+
+    // Start at i = 1 to skip the Header row!
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // Smart split that ignores commas wrapped inside quotes
+      const cols = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(val => val.replace(/^"|"$/g, '').trim());
+      
+      const fullName = cols[1]; 
+      const rollNo = cols[2];   
+      const facultyName = cols[5]; // Column F in your clean CSV
+
+      // 🚨 ADD THIS DIAGNOSTIC BLOCK 🚨
+      if (i === 1) {
+        console.log("=== DIAGNOSTIC ROW 1 ===");
+        console.log("Raw text from file:", line);
+        console.log("How the code split it:", cols);
+        console.log(`Name found: '${fullName}', Roll No found: '${rollNo}'`);
+      }
+
+      if (!fullName || !rollNo) continue;
+
+      // === THE INTELLIGENT MATCHING LOGIC ===
+      let currentFacultyId = "unassigned_mentor"; // Default fallback
+
+      if (facultyName && facultyName !== "") {
+        // Clean prefixes to ensure solid matching (removes "Dr.", "Prof.", etc.)
+        const cleanCsvName = facultyName.toLowerCase().replace(/(dr\.|prof\.)?\s*/g, '').trim();
+        
+        // Find the mentor in the database
+        const matchedMentor = allMentors.find(m => {
+          const cleanDbName = m.fullName.toLowerCase().replace(/(dr\.|prof\.)?\s*/g, '').trim();
+          return cleanDbName.includes(cleanCsvName) || cleanCsvName.includes(cleanDbName);
+        });
+
+        // If we found them, grab their ID!
+        if (matchedMentor) {
+          currentFacultyId = matchedMentor.$id;
+        } else {
+          // If the teacher isn't in the DB yet, we warn you but still import the student
+          errors.push(`Row ${i + 1} (${rollNo}): Mentor '${facultyName}' not found in database. Student marked as Unassigned.`);
+        }
+      }
+
+      // === THE EMAIL GENERATOR ===
+      const cleanRollNo = rollNo.toLowerCase().replace(/\s+/g, '');
+      const generatedEmail = `${cleanRollNo}@sot.pdpu.ac.in`;
+
+      try {
+        // Step A: Create Auth Account
+        try {
+          await users.create(
+            ID.unique(),
+            generatedEmail,
+            undefined,
+            `Pdeu@${cleanRollNo}`, 
+            fullName
+          );
+        } catch (authError: any) {
+          if (authError.code !== 409) throw authError; 
+        }
+
+        // Step B: Create Database Profile WITH the mapped Faculty ID
+        await databases.createDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+          ID.unique(),
+          {
+            fullName: fullName,
+            email: generatedEmail,
+            rollNo: rollNo.toUpperCase(),
+            department: "Unassigned", 
+            role: "mentee",
+            isVerified: true,
+            mentorId: currentFacultyId // Exactly what the college assigned!
+          }
+        );
+        
+        successCount++;
+      } catch (err: any) {
+        if (err.code === 409) {
+          errors.push(`Row ${i + 1} (${rollNo}): Student already exists.`);
+        } else {
+          errors.push(`Row ${i + 1} (${rollNo}): ${err.message}`);
+        }
+      }
+    }
+
+    console.log("=== MAPPED IMPORT RESULTS ===");
+    console.log(`Successfully imported: ${successCount} students.`);
+    console.log(`Errors / Unmatched Mentors:`, errors);
+
+    revalidatePath("/admin-dashboard");
+    return { success: true, count: successCount, errors };
+
+  } catch (error: any) {
+    console.error("Master Import Failed:", error);
     return { success: false, error: error.message };
   }
 }

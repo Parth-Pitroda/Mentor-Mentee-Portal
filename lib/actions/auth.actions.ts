@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { Client, Account, Databases, ID, Query } from "node-appwrite";
+import { redirect } from "next/navigation";
 
 // 1. ADMIN CLIENT: Used to bypass restrictions and generate session secrets
 function createAdminClient() {
@@ -20,13 +21,16 @@ function createSessionClient(sessionSecret: string) {
 }
 
 // ==========================================
-// SIGN UP LOGIC (UPGRADED WITH DYNAMIC ROLES)
+// SIGN UP LOGIC (UPGRADED WITH REDIRECT)
 // ==========================================
 export async function signUpUser(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const name = formData.get("name") as string;
+  // Fallback to grab either 'name' or 'fullName' depending on which form is used
+  const name = (formData.get("name") as string) || (formData.get("fullName") as string); 
   const rollNo = formData.get("rollNo") as string;
+
+  let assignedRole = "mentee"; // Default assumption
 
   try {
     const adminClient = createAdminClient();
@@ -46,7 +50,7 @@ export async function signUpUser(formData: FormData) {
     const hasNumbers = /\d/.test(emailPrefix);
     
     // If it has a number (like 24bcp413d), they are a mentee. Otherwise, a mentor.
-    const assignedRole = hasNumbers ? "mentee" : "mentor";
+    assignedRole = hasNumbers ? "mentee" : "mentor";
 
     await sessionDatabases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -56,16 +60,32 @@ export async function signUpUser(formData: FormData) {
         fullName: name, 
         email: emailLower, 
         rollNo: rollNo || null, 
-        department: "Pending Assignment",
-        role: assignedRole, // 👈 dynamically assigned here!
+        department: "Unassigned", // Start unassigned until they finish onboarding
+        role: assignedRole, 
         isVerified: false 
       }
     );
 
-    return { userId: newAccount.$id, secret: session.secret };
+    // 🍪 SET THE COOKIE SO NEXT.JS KNOWS THEY ARE LOGGED IN
+    const cookieStore = await cookies();
+    cookieStore.set("appwrite-session", session.secret, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "strict",
+      secure: true,
+    });
+
   } catch (error: any) {
     console.error("Sign up failed:", error.message);
-    return null;
+    return { error: error.message };
+  }
+
+  // 🚀 THE MAGIC REDIRECT (Must be outside the try/catch block!)
+  if (assignedRole === "mentee") {
+    redirect("/onboarding");
+  } else {
+    // If a faculty member signs up, send them straight to their dashboard
+    redirect("/mentor-dashboard"); 
   }
 }
 
@@ -105,8 +125,17 @@ export async function signInUser(formData: FormData) {
       console.error("🚨 Profile lookup failed:", err.message);
     }
 
+    // SET COOKIE ON LOGIN TOO
+    const cookieStore = await cookies();
+    cookieStore.set("appwrite-session", session.secret, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "strict",
+      secure: true,
+    });
+
     return { 
-      userId: actualProfileId, // <-- Now we route the user to their true Profile ID
+      userId: actualProfileId,
       secret: session.secret,
       role: userRole, 
       error: null 
