@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeMenteeOnboarding } from "@/lib/actions/student.actions";
 
-export default function OnboardingWizard({ userId }: { userId: string }) {
+export default function OnboardingWizard({ userId, userName, userEmail }: { userId: string, userName?: string, userEmail?: string }) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -12,7 +12,7 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
   // State to hold all fields, including the file object
   const [formData, setFormData] = useState({
     // Step 1: Personal
-    fullName: "", phone: "", email: "", bloodGroup: "", residentialStatus: "", profilePicture: null as File | null,
+    fullName: userName || "", phone: "", email: userEmail || "", bloodGroup: "", residentialStatus: "", profilePicture: null as File | null,
     // Step 2: Academic
     rollNo: "", department: "", semester: "", cgpa: "", backlogs: "0", interests: "",
     // Step 3: Family
@@ -51,7 +51,8 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
     const result = await completeMenteeOnboarding(userId, data);
 
     if (result.success) {
-      router.push("/dashboard"); 
+      router.push(`/dashboard/${userId}`); 
+      router.refresh();
     } else {
       alert("Error saving profile: " + result.error);
       setIsSubmitting(false);
@@ -59,14 +60,14 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       
       {/* --- PROGRESS BAR HEADER --- */}
-      <div className="bg-slate-50 border-b border-slate-100 p-6">
+      <div className="border-b border-slate-100 bg-slate-50 p-6">
         <div className="flex items-center justify-between mb-2">
           {['Personal Details', 'Academic Profile', 'Family Info'].map((stepName, index) => (
             <div key={stepName} className={`flex flex-col items-center w-1/3 ${currentStep >= index + 1 ? 'text-blue-600' : 'text-slate-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mb-2 transition-colors ${currentStep >= index + 1 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+              <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold transition-colors ${currentStep >= index + 1 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {index + 1}
               </div>
               <span className="text-xs font-bold uppercase tracking-wider">{stepName}</span>
@@ -92,24 +93,24 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 mb-2">Profile Picture</label>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-lg"/>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="w-full cursor-pointer rounded-lg border border-slate-200 text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-blue-700 hover:file:bg-blue-100"/>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Full Name</label>
-                <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
-                <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Phone Number</label>
-                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Blood Group</label>
-                  <select name="bloodGroup" value={formData.bloodGroup} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                  <select name="bloodGroup" value={formData.bloodGroup} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Select...</option>
                     <option value="A+">A+</option><option value="A-">A-</option>
                     <option value="B+">B+</option><option value="B-">B-</option>
@@ -119,7 +120,7 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Housing</label>
-                  <select name="residentialStatus" value={formData.residentialStatus} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                  <select name="residentialStatus" value={formData.residentialStatus} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Select...</option>
                     <option value="Hosteller">Hosteller</option>
                     <option value="Day Scholar">Day Scholar</option>
@@ -138,11 +139,11 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Roll Number</label>
-                <input type="text" name="rollNo" value={formData.rollNo} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
+                <input type="text" name="rollNo" value={formData.rollNo} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Department</label>
-                <select name="department" value={formData.department} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                <select name="department" value={formData.department} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Department...</option>
                   <option value="Computer Science">Computer Science</option>
                   <option value="ICT">ICT</option>
@@ -155,22 +156,23 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
               <div className="grid grid-cols-3 gap-4 md:col-span-2">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Semester</label>
-                  <select name="semester" value={formData.semester} onChange={handleChange} required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                  <select name="semester" value={formData.semester} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500">
+                     <option value="">Select...</option>
                      {[1,2,3,4,5,6,7,8].map(sem => <option key={sem} value={sem}>Sem {sem}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Current CGPA</label>
-                  <input type="number" step="0.01" name="cgpa" value={formData.cgpa} onChange={handleChange} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 8.5"/>
+                  <input type="number" step="0.01" name="cgpa" value={formData.cgpa} onChange={handleChange} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5"/>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Active Backlogs</label>
-                  <input type="number" name="backlogs" value={formData.backlogs} onChange={handleChange} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" min="0"/>
+                  <input type="number" name="backlogs" value={formData.backlogs} onChange={handleChange} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" min="0"/>
                 </div>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 mb-2">Key Technical Interests / Skills</label>
-                <input type="text" name="interests" value={formData.interests} onChange={handleChange} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Full-Stack Dev, AutoCAD, Machine Learning..."/>
+                <input type="text" name="interests" value={formData.interests} onChange={handleChange} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Full-Stack Dev, AutoCAD, Machine Learning..."/>
               </div>
             </div>
           </div>
@@ -231,7 +233,7 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
             type="button" 
             onClick={handlePrev} 
             disabled={currentStep === 1}
-            className={`px-6 py-2.5 font-bold rounded-xl transition-colors ${currentStep === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
+            className={`rounded-lg px-6 py-2.5 font-bold transition-colors ${currentStep === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
           >
             Go Back
           </button>
@@ -240,7 +242,7 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
             <button 
               type="button" 
               onClick={handleNext}
-              className="px-8 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-sm transition-colors"
+              className="rounded-lg bg-blue-600 px-8 py-2.5 font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
               Continue to Step {currentStep + 1}
             </button>
@@ -248,7 +250,7 @@ export default function OnboardingWizard({ userId }: { userId: string }) {
             <button 
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-sm transition-colors disabled:bg-green-400"
+              className="rounded-lg bg-green-600 px-8 py-2.5 font-bold text-white shadow-sm transition-colors hover:bg-green-700 disabled:bg-green-400"
             >
               {isSubmitting ? "Saving Profile..." : "Submit Profile"}
             </button>

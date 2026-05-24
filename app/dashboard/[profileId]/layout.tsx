@@ -1,9 +1,17 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Toaster } from "react-hot-toast";
+import { Client, Databases, Query } from "node-appwrite";
 import LogoutButton from "@/components/LogoutButton";
+import DashboardSidebarNav from "@/components/DashboardSidebarNav";
+import PortalTopNavbar from "@/components/PortalTopNavbar";
 
+
+type DashboardProfile = {
+  $id: string;
+  email?: string;
+  role?: string;
+  mentorId?: string;
+};
 
 export const dynamic = "force-dynamic";
 export default async function DashboardLayout({
@@ -19,45 +27,75 @@ export default async function DashboardLayout({
   // If the manual cookie isn't found, redirect to sign-in
   if (!user) redirect("/sign-in");
 
+  let currentProfile: DashboardProfile | null = null;
+  let targetProfile: DashboardProfile | null = null;
+
+  try {
+    const client = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(client);
+    const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+    const profilesCollection = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+
+    const [currentProfileRes, fetchedTargetProfile] = await Promise.all([
+      databases.listDocuments(databaseId, profilesCollection, [
+        Query.equal("email", [user.email.toLowerCase()])
+      ]),
+      databases.getDocument(databaseId, profilesCollection, profileId).catch(() => null)
+    ]);
+
+    currentProfile = currentProfileRes.documents[0] as DashboardProfile | undefined || null;
+    targetProfile = fetchedTargetProfile as DashboardProfile | null;
+  } catch (error) {
+    console.error("Dashboard access check failed:", error);
+    redirect("/sign-in");
+  }
+
+  if (!currentProfile || !targetProfile) redirect("/sign-in");
+
+  if (currentProfile.role === "mentor") {
+    if (targetProfile.mentorId === currentProfile.$id) {
+      redirect(`/mentor-dashboard?tab=student-profile&id=${profileId}`);
+    }
+
+    redirect("/mentor-dashboard");
+  }
+
+  if (targetProfile.email?.toLowerCase() !== user.email.toLowerCase()) {
+    redirect(`/dashboard/${currentProfile.$id}`);
+  }
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-20">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-bold text-blue-900 tracking-tight font-sans">PDEU PORTAL</h2>
+    <div className="min-h-screen bg-slate-50">
+      <PortalTopNavbar userName={user.name || "User"} userEmail={user.email} />
+
+      <aside className="fixed top-16 z-20 hidden h-[calc(100vh-4rem)] w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
+        <div className="border-b border-slate-100 p-6">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Student Workspace</p>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href={`/dashboard/${profileId}`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
-            Overview Dashboard
-          </Link>
-          <Link href={`/dashboard/${profileId}/meetings`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
-            Meeting Logs
-          </Link>
-          <Link href={`/dashboard/${profileId}/academics`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
-            Academic Records
-          </Link>
-          <Link href={`/dashboard/${profileId}/achievements`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
-            Achievements
-          </Link>
-          <Link href={`/dashboard/${profileId}/profile`} className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-blue-700 rounded-lg transition-colors font-medium">
-            Mentorship Profile
-          </Link>
+        <nav className="flex-1 p-4 space-y-1.5">
+          <DashboardSidebarNav profileId={profileId} />
         
-          <div className="flex items-center justify-between">
-          <LogoutButton />
-  </div>
         </nav>
         
         <div className="p-4 border-t border-slate-100">
-           <div className="flex items-center gap-3 px-2">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs">
+           <div className="flex items-center gap-3 px-2 mb-4">
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 font-bold text-xs">
                 {user.name.charAt(0)}
               </div>
-              <span className="text-sm font-medium text-slate-700 truncate">{user.name}</span>
+              <div className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-800 truncate">{user.name}</span>
+                <span className="block text-xs text-slate-500 truncate">{user.email}</span>
+              </div>
            </div>
+           <LogoutButton />
         </div>
       </aside>
-      <div className="flex-1 flex flex-col md:ml-64">
-        <main className="flex-1 bg-slate-50 min-h-screen p-8">
+      <div className="flex min-h-screen flex-col pt-16 md:ml-[17rem]">
+        <main className="min-h-screen flex-1 bg-slate-50 p-6 lg:p-8">
           {children}
         </main>
       </div>

@@ -5,14 +5,518 @@ import { revalidatePath } from "next/cache";
 import { InputFile } from "node-appwrite/file";
 import { Client, Databases, ID, Query, Storage, Users } from "node-appwrite";
 import { ProfileUpdateSchema } from "@/lib/validation/schema";
+import { getLoggedInUser } from "@/lib/actions/auth.actions";
 
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+const MENTOR_SCHEDULED_MEETING_MARKER = "[Mentor Scheduled Meeting]";
 
-// ==========================================
-// 1. Fetch a Single Student (For Mentee Dashboard)
-// ==========================================
+type NotificationPayload = {
+  $id: string;
+  userId: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  relatedId: string;
+  timestamp: string;
+  $createdAt?: string;
+  isVirtual?: boolean;
+};
+
+type ActivityDocument = {
+  $id: string;
+  $createdAt?: string;
+  studentId?: string;
+  studentName?: string;
+  topic?: string;
+  date?: string;
+  proposedDate?: string;
+  proposedTime?: string;
+  semester?: string | number;
+  title?: string;
+  category?: string;
+  status?: string;
+};
+
+function createAdminDatabases() {
+  const adminClient = new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+    .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+  return new Databases(adminClient);
+}
+
+export async function getProfileByEmail(email: string) {
+  try {
+    const adminDatabases = createAdminDatabases();
+    const profiles = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("email", [email.toLowerCase().trim()])]
+    );
+
+    return profiles.total > 0 ? JSON.parse(JSON.stringify(profiles.documents[0])) : null;
+  } catch (error) {
+    console.error("Failed to fetch profile by email:", error);
+    return null;
+  }
+}
+
+async function getCurrentProfileForUser(adminDatabases: Databases, email: string) {
+  const profiles = await adminDatabases.listDocuments(
+    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+    process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+    [Query.equal("email", [email.toLowerCase().trim()]), Query.limit(1)]
+  );
+
+  return profiles.documents[0] || null;
+}
+
+function sortNotifications(notifications: NotificationPayload[]) {
+  return notifications.sort((a, b) => {
+    const aTime = new Date(a.timestamp || a.$createdAt || 0).getTime();
+    const bTime = new Date(b.timestamp || b.$createdAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+function createActivityNotification({
+  id,
+  userId,
+  message,
+  type,
+  relatedId,
+  timestamp,
+}: {
+  id: string;
+  userId: string;
+  message: string;
+  type: string;
+  relatedId: string;
+  timestamp?: string;
+}): NotificationPayload {
+  return {
+    $id: `activity-${type}-${id}`,
+    userId,
+    message,
+    type,
+    relatedId,
+    isRead: false,
+    isVirtual: true,
+    timestamp: timestamp || new Date().toISOString(),
+  };
+}
+
+function mergeNotificationsWithActivity(notifications: NotificationPayload[], activity: NotificationPayload[]) {
+  const seen = new Set<string>();
+
+  const merged = [...notifications, ...activity].filter((notification) => {
+    const key = `${notification.type}:${notification.relatedId || notification.$id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return sortNotifications(merged).slice(0, 25);
+}
+
+async function getMentorRecentActivity(adminDatabases: Databases, mentorIds: string[], feedUserId: string) {
+  const menteesList = await adminDatabases.listDocuments(
+    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+    process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+    [Query.equal("mentorId", mentorIds), Query.limit(100)]
+  );
+
+  if (menteesList.total === 0) return [];
+
+  const menteeIds: string[] = [];
+  const studentMap: Record<string, string> = {};
+
+  menteesList.documents.forEach((doc) => {
+    menteeIds.push(doc.$id);
+    studentMap[doc.$id] = doc.fullName || "A mentee";
+  });
+
+  const [meetingRequests, pendingMeetings, pendingAcademics, pendingAchievements] = await Promise.all([
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [Query.equal("studentId", menteeIds), Query.equal("status", ["Requested"]), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+  ]);
+
+  const activities: NotificationPayload[] = [];
+
+  (meetingRequests.documents as ActivityDocument[]).forEach((request) => {
+    const studentName = request.studentId ? studentMap[request.studentId] || "A mentee" : "A mentee";
+    activities.push(createActivityNotification({
+      id: request.$id,
+      userId: feedUserId,
+      type: "meeting_request_pending",
+      relatedId: request.$id,
+      timestamp: request.$createdAt,
+      message: `${studentName} requested a meeting${request.proposedDate || request.date ? ` on ${request.proposedDate || request.date}` : ""}${request.proposedTime ? ` at ${request.proposedTime}` : ""}.`,
+    }));
+  });
+
+  (pendingMeetings.documents as ActivityDocument[]).forEach((meeting) => {
+    const studentName = meeting.studentId ? studentMap[meeting.studentId] || "A mentee" : "A mentee";
+    activities.push(createActivityNotification({
+      id: meeting.$id,
+      userId: feedUserId,
+      type: "meeting_log_submission",
+      relatedId: meeting.$id,
+      timestamp: meeting.$createdAt,
+      message: `${studentName} submitted a meeting log${meeting.topic ? ` for "${meeting.topic}"` : ""}.`,
+    }));
+  });
+
+  (pendingAcademics.documents as ActivityDocument[]).forEach((record) => {
+    const studentName = record.studentId ? studentMap[record.studentId] || "A mentee" : "A mentee";
+    activities.push(createActivityNotification({
+      id: record.$id,
+      userId: feedUserId,
+      type: "academic_submission",
+      relatedId: record.$id,
+      timestamp: record.$createdAt,
+      message: `${studentName} uploaded academic results${record.semester ? ` for Semester ${record.semester}` : ""}.`,
+    }));
+  });
+
+  (pendingAchievements.documents as ActivityDocument[]).forEach((achievement) => {
+    const studentName = achievement.studentId ? studentMap[achievement.studentId] || "A mentee" : "A mentee";
+    activities.push(createActivityNotification({
+      id: achievement.$id,
+      userId: feedUserId,
+      type: "achievement_submission",
+      relatedId: achievement.$id,
+      timestamp: achievement.$createdAt,
+      message: `${studentName} submitted an achievement${achievement.title ? `: ${achievement.title}` : ""}.`,
+    }));
+  });
+
+  return activities;
+}
+
+async function getMenteeRecentActivity(adminDatabases: Databases, profileIds: string[], feedUserId: string) {
+  const [meetings, academics, achievements] = await Promise.all([
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [Query.equal("studentId", profileIds), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      [Query.equal("studentId", profileIds), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+    adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      [Query.equal("studentId", profileIds), Query.orderDesc("$createdAt"), Query.limit(10)]
+    ).catch(() => ({ documents: [] })),
+  ]);
+
+  const activities: NotificationPayload[] = [];
+
+  (meetings.documents as ActivityDocument[]).forEach((meeting) => {
+    if (meeting.status === "Requested") {
+      activities.push(createActivityNotification({
+        id: meeting.$id,
+        userId: feedUserId,
+        type: "meeting_request",
+        relatedId: meeting.$id,
+        timestamp: meeting.$createdAt,
+        message: `Your meeting request${meeting.proposedDate || meeting.date ? ` for ${meeting.proposedDate || meeting.date}` : ""} is waiting for mentor confirmation.`,
+      }));
+      return;
+    }
+
+    if (meeting.status === "Confirmed" || meeting.status === "Rejected") {
+      activities.push(createActivityNotification({
+        id: meeting.$id,
+        userId: feedUserId,
+        type: "meeting_request",
+        relatedId: meeting.$id,
+        timestamp: meeting.$createdAt,
+        message: `Your meeting request has been ${String(meeting.status).toLowerCase()}.`,
+      }));
+      return;
+    }
+
+    if (meeting.status === "Scheduled") {
+      activities.push(createActivityNotification({
+        id: meeting.$id,
+        userId: feedUserId,
+        type: "meeting_request",
+        relatedId: meeting.$id,
+        timestamp: meeting.$createdAt,
+        message: `A meeting${meeting.topic ? ` for "${meeting.topic}"` : ""} is scheduled${meeting.date ? ` on ${meeting.date}` : ""}.`,
+      }));
+    }
+  });
+
+  (academics.documents as ActivityDocument[]).forEach((record) => {
+    const status = record.status || "Pending";
+    activities.push(createActivityNotification({
+      id: record.$id,
+      userId: feedUserId,
+      type: "academic_status",
+      relatedId: record.$id,
+      timestamp: record.$createdAt,
+      message: `Your academic record${record.semester ? ` for Semester ${record.semester}` : ""} is ${String(status).toLowerCase()}.`,
+    }));
+  });
+
+  (achievements.documents as ActivityDocument[]).forEach((achievement) => {
+    const status = achievement.status || "Pending";
+    activities.push(createActivityNotification({
+      id: achievement.$id,
+      userId: feedUserId,
+      type: "achievement_status",
+      relatedId: achievement.$id,
+      timestamp: achievement.$createdAt,
+      message: `Your achievement${achievement.title ? ` "${achievement.title}"` : ""} is ${String(status).toLowerCase()}.`,
+    }));
+  });
+
+  return activities;
+}
+
+async function getNotificationRecipientIds() {
+  const user = await getLoggedInUser();
+  if (!user) return null;
+
+  const adminDatabases = createAdminDatabases();
+  const currentProfile = await getCurrentProfileForUser(adminDatabases, user.email).catch(() => null);
+  const profileId = currentProfile?.$id || user.$id;
+
+  return {
+    user,
+    adminDatabases,
+    profileId,
+    role: currentProfile?.role || "mentee",
+    recipientIds: Array.from(new Set([user.$id, profileId])),
+  };
+}
+
+async function getNotificationsForRecipients(adminDatabases: Databases, recipientIds: string[]) {
+  const notificationCollection = process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!;
+
+  if (!notificationCollection) return [];
+
+  try {
+    const notifications = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      notificationCollection,
+      [
+        Query.equal("userId", recipientIds),
+        Query.orderDesc("$createdAt"),
+        Query.limit(100),
+      ]
+    );
+
+    return notifications.documents as unknown as NotificationPayload[];
+  } catch {
+    try {
+      const notifications = await adminDatabases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        notificationCollection,
+        [Query.limit(100)]
+      );
+
+      return (notifications.documents as unknown as NotificationPayload[]).filter((notification) =>
+        recipientIds.includes(notification.userId)
+      );
+    } catch (error) {
+      console.error("Failed to fetch stored notifications:", error);
+      return [];
+    }
+  }
+}
+
+export async function getCurrentUserNotificationState() {
+  try {
+    const notificationScope = await getNotificationRecipientIds();
+    if (!notificationScope) {
+      return { notifications: [], unreadCount: 0, userId: null, profileId: null, role: null };
+    }
+
+    const notifications = await getNotificationsForRecipients(
+      notificationScope.adminDatabases,
+      notificationScope.recipientIds
+    );
+    const activity = notificationScope.role === "mentor"
+      ? await getMentorRecentActivity(
+          notificationScope.adminDatabases,
+          notificationScope.recipientIds,
+          notificationScope.profileId
+        )
+      : await getMenteeRecentActivity(
+          notificationScope.adminDatabases,
+          notificationScope.recipientIds,
+          notificationScope.profileId
+        );
+    const mergedNotifications = mergeNotificationsWithActivity(
+      JSON.parse(JSON.stringify(notifications)),
+      JSON.parse(JSON.stringify(activity))
+    );
+    const unreadCount = mergedNotifications.filter((notification) => !notification.isRead).length;
+
+    return JSON.parse(JSON.stringify({
+      notifications: mergedNotifications,
+      unreadCount,
+      userId: notificationScope.user.$id,
+      profileId: notificationScope.profileId,
+      role: notificationScope.role,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch notifications:", error);
+    return { notifications: [], unreadCount: 0, userId: null, profileId: null, role: null };
+  }
+}
+
+async function isNotificationOwnedByCurrentUser(notificationId: string) {
+  const notificationScope = await getNotificationRecipientIds();
+  if (!notificationScope) return null;
+
+  const notification = await notificationScope.adminDatabases.getDocument(
+    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+    process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
+    notificationId
+  );
+
+  if (!notificationScope.recipientIds.includes(notification.userId)) {
+    return null;
+  }
+
+  return { adminDatabases: notificationScope.adminDatabases, notification };
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  try {
+    const ownedNotification = await isNotificationOwnedByCurrentUser(notificationId);
+    if (!ownedNotification) return { success: false };
+
+    await ownedNotification.adminDatabases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
+      notificationId,
+      { isRead: true }
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to mark notification as read:", error);
+    return { success: false };
+  }
+}
+
+export async function markAllCurrentUserNotificationsAsRead() {
+  try {
+    const notificationScope = await getNotificationRecipientIds();
+    if (!notificationScope) return { success: false };
+
+    const notifications = await getNotificationsForRecipients(
+      notificationScope.adminDatabases,
+      notificationScope.recipientIds
+    );
+
+    await Promise.all(
+      notifications
+        .filter((notification) => !notification.isRead)
+        .map((notification) =>
+          notificationScope.adminDatabases.updateDocument(
+            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+            process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
+            notification.$id,
+            { isRead: true }
+          )
+        )
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to mark all notifications as read:", error);
+    return { success: false };
+  }
+}
+
+export async function deleteCurrentUserNotification(notificationId: string) {
+  try {
+    const ownedNotification = await isNotificationOwnedByCurrentUser(notificationId);
+    if (!ownedNotification) return { success: false };
+
+    await ownedNotification.adminDatabases.deleteDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
+      notificationId
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete notification:", error);
+    return { success: false };
+  }
+}
+
+// Helper to create a notification for a user/profile id.
+async function createNotification(userId: string, message: string, type: string, relatedId?: string) {
+  try {
+    const databases = createAdminDatabases();
+    await databases.createDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
+      ID.unique(),
+      {
+        userId,
+        message,
+        type,
+        isRead: false,
+        relatedId: relatedId || "",
+        timestamp: new Date().toISOString(),
+      }
+    );
+  } catch (error) {
+    console.error("Failed to create notification:", error);
+  }
+}
+
+async function notifyAssignedMentor(studentId: string, message: string, type: string, relatedId?: string) {
+  try {
+    const adminDatabases = createAdminDatabases();
+    const student = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId
+    );
+
+    if (!student.mentorId) return;
+
+    await createNotification(student.mentorId, message, type, relatedId);
+  } catch (error) {
+    console.error("Failed to notify assigned mentor:", error);
+  }
+}
+
+
 export async function getStudentProfile(profileId: string) {
   try {
     const profile = await databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, profileId);
@@ -221,7 +725,7 @@ export async function logMeeting(data: {
     const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
 
-    await databases.createDocument(
+    const createdMeeting = await databases.createDocument(
       DATABASE_ID,
       MEETINGS_COLLECTION,
       ID.unique(),
@@ -237,6 +741,15 @@ export async function logMeeting(data: {
 
     // Refresh the page data automatically
     revalidatePath(`/dashboard/${data.studentId}/meetings`);
+    revalidatePath("/mentor-dashboard/approvals");
+
+    await notifyAssignedMentor(
+      data.studentId,
+      `A meeting log for "${data.topic}" is waiting for your review.`,
+      "meeting_log_submission",
+      createdMeeting.$id
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Failed to log meeting:", error);
@@ -268,12 +781,490 @@ export async function updateMeetingStatus(meetingId: string, newStatus: "Verifie
     // 3. Clear Next.js cache for all relevant pages so the badge updates instantly
     revalidatePath(`/mentor-dashboard`);
     revalidatePath(`/dashboard/${studentId}/meetings`);
-    revalidatePath(`/dashboard/${studentId}`); 
-    
+    revalidatePath(`/dashboard/${studentId}`);
+
+    await createNotification(
+      studentId,
+      `Your meeting log has been ${newStatus.toLowerCase()} by your mentor.`,
+      "meeting_status",
+      meetingId
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Failed to update meeting status:", error);
     return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 11.5. Request Meeting (Mentee Action)
+// ==========================================
+export async function requestMeeting(studentId: string, formData: FormData) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to request a meeting." };
+    }
+
+    const proposedDate = String(formData.get("proposedDate") || "");
+    const proposedTime = String(formData.get("proposedTime") || "");
+    const agenda = String(formData.get("agenda") || "").trim();
+
+    if (!proposedDate || !proposedTime || !agenda) {
+      return { success: false, error: "Please provide a date, time, and agenda." };
+    }
+
+    const adminDatabases = createAdminDatabases();
+    const profile = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId
+    );
+
+    if (profile.email?.toLowerCase() !== user.email.toLowerCase()) {
+      return { success: false, error: "You can only request meetings for your own profile." };
+    }
+
+    if (!profile.mentorId) {
+      return { success: false, error: "A mentor has not been assigned to your profile yet." };
+    }
+
+    const mentorProfile = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      profile.mentorId
+    ).catch(() => null);
+
+    const mentorName = mentorProfile?.fullName || "Faculty Mentor";
+    const richPayload = {
+      studentId,
+      mentorId: profile.mentorId,
+      date: proposedDate,
+      topic: "Meeting Request",
+      mentorName,
+      description: agenda,
+      status: "Requested",
+      requestedBy: "mentee",
+      proposedDate,
+      proposedTime,
+      agenda,
+    };
+
+    let createdMeeting;
+    try {
+      createdMeeting = await adminDatabases.createDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+        ID.unique(),
+        richPayload
+      );
+    } catch {
+      const compatiblePayload = {
+        studentId,
+        date: proposedDate,
+        topic: `Meeting Request (${proposedTime})`,
+        mentorName,
+        description: `Requested time: ${proposedTime}\n\nAgenda: ${agenda}`,
+        status: "Requested",
+      };
+      createdMeeting = await adminDatabases.createDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+        ID.unique(),
+        compatiblePayload
+      );
+    }
+
+    revalidatePath(`/dashboard/${studentId}`);
+    revalidatePath(`/dashboard/${studentId}/meetings`);
+    revalidatePath("/mentor-dashboard/approvals");
+    revalidatePath("/mentor-dashboard");
+
+    await createNotification(
+      profile.mentorId,
+      `${profile.fullName || "A mentee"} requested a meeting on ${proposedDate} at ${proposedTime}.`,
+      "meeting_request_pending",
+      createdMeeting.$id
+    );
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to request meeting:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to request meeting.",
+    };
+  }
+}
+
+// ==========================================
+// 11.6. Fetch Meeting Requests (Mentor)
+// ==========================================
+export async function getMeetingRequests(mentorId: string) {
+  try {
+    const adminDatabases = createAdminDatabases();
+    const menteesList = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [Query.equal("mentorId", [mentorId]), Query.limit(100)]
+    );
+
+    if (menteesList.total === 0) return [];
+
+    const menteeIds: string[] = [];
+    const studentMap: Record<string, string> = {};
+
+    menteesList.documents.forEach((doc) => {
+      menteeIds.push(doc.$id);
+      studentMap[doc.$id] = doc.fullName || "Unknown Student";
+    });
+
+    const requests = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", menteeIds),
+        Query.equal("status", ["Requested"]),
+        Query.orderDesc("$createdAt"),
+      ]
+    );
+
+    const mappedRequests = requests.documents.map((request) => ({
+      ...request,
+      studentName: studentMap[request.studentId] || "Unknown Student",
+    }));
+
+    return JSON.parse(JSON.stringify(mappedRequests));
+  } catch (error) {
+    console.error("Failed to fetch meeting requests:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 11.7. Respond to Meeting Request (Mentor)
+// ==========================================
+export async function respondToMeetingRequest(meetingId: string, response: "Confirmed" | "Rejected", message?: string) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to respond to requests." };
+    }
+
+    const adminDatabases = createAdminDatabases();
+    const meeting = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      meetingId
+    );
+
+    const student = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      meeting.studentId
+    );
+
+    if (student.mentorId !== user.$id) {
+      return { success: false, error: "Only the assigned mentor can respond to this request." };
+    }
+
+    let updatedDescription = meeting.description || "";
+    if (message) {
+      const header = response === "Rejected" ? "Mentor Rejection Reason" : "Mentor Message";
+      updatedDescription = `${updatedDescription}\n\n--- ${header} ---\n${message}`;
+    }
+
+    await adminDatabases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      meetingId,
+      { 
+        status: response,
+        description: updatedDescription
+      }
+    );
+
+    revalidatePath("/mentor-dashboard/approvals");
+    revalidatePath(`/dashboard/${meeting.studentId}`);
+    revalidatePath(`/dashboard/${meeting.studentId}/meetings`);
+    revalidatePath(`/dashboard/${meeting.studentId}/notifications`);
+
+    await createNotification(
+      meeting.studentId,
+      `Your meeting request has been ${response.toLowerCase()} by your mentor.`,
+      "meeting_request",
+      meetingId
+    );
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to respond to meeting request:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to respond to meeting request.",
+    };
+  }
+}
+
+// ==========================================
+// 11.8. Schedule Meeting For Mentor Roster
+// ==========================================
+export async function scheduleMentorMeeting(formData: FormData) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to schedule a meeting." };
+    }
+
+    const topic = String(formData.get("topic") || "").trim();
+    const date = String(formData.get("date") || "");
+    const time = String(formData.get("time") || "");
+    const mode = String(formData.get("mode") || "OFFLINE").toUpperCase();
+    const link = String(formData.get("link") || "").trim();
+    const agenda = String(formData.get("agenda") || "").trim();
+    const recipientMode = String(formData.get("recipientMode") || "all");
+    const selectedStudentIds = formData
+      .getAll("studentIds")
+      .map((id) => String(id))
+      .filter(Boolean);
+
+    if (!topic || !date || !time || !agenda) {
+      return { success: false, error: "Please provide a topic, date, time, and agenda." };
+    }
+
+    if (mode === "ONLINE" && !link) {
+      return { success: false, error: "Please add a meeting link for online meetings." };
+    }
+
+    const adminDatabases = createAdminDatabases();
+    const mentorProfile = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      user.$id
+    ).catch(() => null);
+
+    if (mentorProfile && mentorProfile.role !== "mentor") {
+      return { success: false, error: "Only mentors can schedule roster meetings." };
+    }
+
+    const mentees = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [
+        Query.equal("role", ["mentee"]),
+        Query.equal("mentorId", user.$id),
+        Query.limit(100),
+      ]
+    );
+
+    if (mentees.total === 0) {
+      return { success: false, error: "No assigned mentees found for this mentor." };
+    }
+
+    const targetMentees = recipientMode === "selected"
+      ? mentees.documents.filter((mentee) => selectedStudentIds.includes(mentee.$id))
+      : mentees.documents;
+
+    if (recipientMode === "selected" && selectedStudentIds.length === 0) {
+      return { success: false, error: "Please select at least one mentee." };
+    }
+
+    if (targetMentees.length === 0) {
+      return { success: false, error: "No valid assigned mentees were selected." };
+    }
+
+    const mentorName = mentorProfile?.fullName || user.name || "Faculty Mentor";
+    const description = [
+      MENTOR_SCHEDULED_MEETING_MARKER,
+      `Time: ${time}`,
+      `Mode: ${mode === "ONLINE" ? "Online" : "Offline"}`,
+      mode === "ONLINE" ? `Link: ${link}` : "",
+      "",
+      "Agenda:",
+      agenda,
+    ].filter(Boolean).join("\n");
+
+    let supportsRichPayload = true;
+    let createdCount = 0;
+
+    for (const mentee of targetMentees) {
+      const basePayload = {
+        studentId: mentee.$id,
+        date,
+        topic,
+        mentorName,
+        description,
+        status: "Scheduled",
+      };
+
+      const richPayload = {
+        ...basePayload,
+        mentorId: user.$id,
+        scheduledBy: "mentor",
+        scheduledTime: time,
+        meetingMode: mode,
+        meetingLink: mode === "ONLINE" ? link : "",
+        agenda,
+      };
+
+      let createdMeeting;
+      if (supportsRichPayload) {
+        try {
+          createdMeeting = await adminDatabases.createDocument(
+            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+            process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+            ID.unique(),
+            richPayload
+          );
+        } catch {
+          supportsRichPayload = false;
+        }
+      }
+
+      if (!createdMeeting) {
+        createdMeeting = await adminDatabases.createDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+          ID.unique(),
+          basePayload
+        );
+      }
+
+      createdCount += 1;
+
+      await createNotification(
+        mentee.$id,
+        `Your mentor scheduled "${topic}" on ${date} at ${time}.`,
+        "meeting_request",
+        createdMeeting.$id
+      );
+    }
+
+    revalidatePath("/mentor-dashboard");
+    for (const mentee of targetMentees) {
+      revalidatePath(`/dashboard/${mentee.$id}`);
+      revalidatePath(`/dashboard/${mentee.$id}/meetings`);
+    }
+
+    return { success: true, count: createdCount };
+  } catch (error: unknown) {
+    console.error("Failed to schedule mentor meeting:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to schedule meeting.",
+    };
+  }
+}
+
+// ==========================================
+// 11.9. Fetch Mentor Scheduled Meetings
+// ==========================================
+export async function getMentorScheduledMeetings(mentorId: string) {
+  try {
+    const adminDatabases = createAdminDatabases();
+    const mentees = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      [
+        Query.equal("role", ["mentee"]),
+        Query.equal("mentorId", mentorId),
+        Query.limit(100),
+      ]
+    );
+
+    if (mentees.total === 0) return [];
+
+    const menteeIds: string[] = [];
+    const studentMap: Record<string, {
+      $id: string;
+      fullName?: string;
+      email?: string;
+      department?: string;
+      rollNo?: string;
+      semester?: string;
+      profilePictureId?: string;
+    }> = {};
+    mentees.documents.forEach((mentee) => {
+      menteeIds.push(mentee.$id);
+      studentMap[mentee.$id] = mentee;
+    });
+
+    const meetings = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", menteeIds),
+        Query.orderDesc("$createdAt"),
+        Query.limit(100),
+      ]
+    );
+
+    const scheduledMeetings = meetings.documents
+      .filter((meeting) => String(meeting.description || "").includes(MENTOR_SCHEDULED_MEETING_MARKER))
+      .map((meeting) => ({
+        ...meeting,
+        student: studentMap[meeting.studentId] || null,
+        studentName: studentMap[meeting.studentId]?.fullName || "Unknown Student",
+      }));
+
+    return JSON.parse(JSON.stringify(scheduledMeetings));
+  } catch (error) {
+    console.error("Failed to fetch mentor scheduled meetings:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 11.10. Mark Roster Meeting Attendance
+// ==========================================
+export async function updateScheduledMeetingAttendance(meetingId: string, studentId: string, attended: boolean) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to update attendance." };
+    }
+
+    const adminDatabases = createAdminDatabases();
+    const [meeting, student] = await Promise.all([
+      adminDatabases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+        meetingId
+      ),
+      adminDatabases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        studentId
+      ),
+    ]);
+
+    if (student.mentorId !== user.$id || meeting.studentId !== studentId) {
+      return { success: false, error: "Only the assigned mentor can update this attendance." };
+    }
+
+    if (!String(meeting.description || "").includes(MENTOR_SCHEDULED_MEETING_MARKER)) {
+      return { success: false, error: "This meeting is not a roster scheduled meeting." };
+    }
+
+    await adminDatabases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      meetingId,
+      { status: attended ? "Verified" : "Scheduled" }
+    );
+
+    revalidatePath("/mentor-dashboard");
+    revalidatePath(`/dashboard/${studentId}`);
+    revalidatePath(`/dashboard/${studentId}/meetings`);
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Failed to update meeting attendance:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update attendance.",
+    };
   }
 }
 
@@ -310,7 +1301,7 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
       appwriteInputFile // <-- Use the converted file here!
     );
 
-    await databases.createDocument(
+    const academicRecord = await databases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       ID.unique(),
@@ -325,6 +1316,16 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
     );
 
     revalidatePath(`/dashboard/${studentId}/academics`);
+    revalidatePath("/mentor-dashboard");
+    revalidatePath("/mentor-dashboard/approvals");
+
+    await notifyAssignedMentor(
+      studentId,
+      `A mentee submitted Semester ${semester} academic records for approval.`,
+      "academic_submission",
+      academicRecord.$id
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Upload failed:", error);
@@ -352,6 +1353,17 @@ export async function updateAcademicStatus(recordId: string, newStatus: "Verifie
     );
 
     revalidatePath(`/dashboard/${studentId}/academics`);
+    revalidatePath(`/dashboard/${studentId}/notifications`);
+    revalidatePath("/mentor-dashboard/approvals");
+    revalidatePath("/mentor-dashboard");
+
+    await createNotification(
+      studentId,
+      `Your academic record has been ${newStatus.toLowerCase()} by your mentor.`,
+      "academic_status",
+      recordId
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Verification failed:", error);
@@ -393,7 +1405,7 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
       fileId = uploadedFile.$id;
     }
 
-    await databases.createDocument(
+    const achievement = await databases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
       ID.unique(),
@@ -408,6 +1420,16 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
     );
 
     revalidatePath(`/dashboard/${studentId}/achievements`);
+    revalidatePath("/mentor-dashboard");
+    revalidatePath("/mentor-dashboard/approvals");
+
+    await notifyAssignedMentor(
+      studentId,
+      `A mentee submitted "${title}" for achievement approval.`,
+      "achievement_submission",
+      achievement.$id
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Achievement upload failed:", error);
@@ -435,6 +1457,17 @@ export async function updateAchievementStatus(achievementId: string, newStatus: 
     );
 
     revalidatePath(`/dashboard/${studentId}/achievements`);
+    revalidatePath(`/dashboard/${studentId}/notifications`);
+    revalidatePath("/mentor-dashboard/approvals");
+    revalidatePath("/mentor-dashboard");
+
+    await createNotification(
+      studentId,
+      `Your achievement has been ${newStatus.toLowerCase()} by your mentor.`,
+      "achievement_status",
+      achievementId
+    );
+
     return { success: true };
   } catch (error: any) {
     console.error("Achievement verification failed:", error);
@@ -633,10 +1666,10 @@ export async function getPendingApprovals(mentorId: string) {
     const menteesList = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      [Query.equal("mentorId", [mentorId])]
+      [Query.equal("mentorId", [mentorId]), Query.limit(100)]
     );
 
-    if (menteesList.total === 0) return { meetings: [], academics: [], achievements: [] };
+    if (menteesList.total === 0) return { meetings: [], meetingRequests: [], academics: [], achievements: [] };
 
     // 2. Map their IDs and Names so we know WHO submitted the request
     const menteeIds: string[] = [];
@@ -648,39 +1681,45 @@ export async function getPendingApprovals(mentorId: string) {
     });
 
     // 3. Fetch ALL pending requests across all three collections simultaneously using Promise.all
-    const [pendingMeetings, pendingAcademics, pendingAchievements] = await Promise.all([
+    const [pendingMeetings, meetingRequests, pendingAcademics, pendingAchievements] = await Promise.all([
       databases.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
+      ),
+      databases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Requested"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       ),
       databases.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
         process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
-        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       ),
       databases.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
         process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
-        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt")]
+        [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       )
     ]);
 
     // 4. Attach the student's name to the requests
-    const mapWithNames = (docs: any[]) => docs.map(doc => ({
+    const mapWithNames = (docs: Array<{ studentId?: string; [key: string]: unknown }>) => docs.map(doc => ({
       ...doc,
-      studentName: studentMap[doc.studentId] || "Unknown Student"
+      studentName: doc.studentId ? studentMap[doc.studentId] || "Unknown Student" : "Unknown Student"
     }));
 
     return JSON.parse(JSON.stringify({ 
       meetings: mapWithNames(pendingMeetings.documents),
+      meetingRequests: mapWithNames(meetingRequests.documents),
       academics: mapWithNames(pendingAcademics.documents),
       achievements: mapWithNames(pendingAchievements.documents)
     }));
 
   } catch (error) {
     console.error("Failed to fetch pending approvals:", error);
-    return { meetings: [], academics: [], achievements: [] };
+    return { meetings: [], meetingRequests: [], academics: [], achievements: [] };
   }
 }
 
@@ -1204,12 +2243,7 @@ export async function getSystemActivityLog() {
 // ==========================================
 export async function getMentorRoster(mentorId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
 
     const mentees = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1222,7 +2256,56 @@ export async function getMentorRoster(mentorId: string) {
       ]
     );
 
-    return JSON.parse(JSON.stringify(mentees.documents));
+    if (mentees.total === 0) return [];
+
+    const menteeIds = mentees.documents.map((mentee) => mentee.$id);
+    let latestAcademicByStudent: Record<string, { cpi?: string | number; spi?: string | number; semester?: string | number }> = {};
+
+    try {
+      const academicRecords = await databases.listDocuments(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+        [
+          Query.equal("studentId", menteeIds),
+          Query.equal("status", ["Verified"]),
+          Query.orderDesc("$createdAt"),
+          Query.limit(100),
+        ]
+      );
+
+      latestAcademicByStudent = academicRecords.documents.reduce((acc, record) => {
+        if (record.studentId && !acc[record.studentId]) {
+          acc[record.studentId] = {
+            cpi: record.cpi,
+            spi: record.spi,
+            semester: record.semester,
+          };
+        }
+
+        return acc;
+      }, {} as Record<string, { cpi?: string | number; spi?: string | number; semester?: string | number }>);
+    } catch (error) {
+      console.error("Failed to fetch roster academic performance:", error);
+    }
+
+    const roster = mentees.documents.map((mentee) => {
+      const latestAcademic = latestAcademicByStudent[mentee.$id];
+      const profileCgpa = Number(mentee.cgpa || 0);
+      const latestCpi = Number(latestAcademic?.cpi || 0);
+      const latestSpi = Number(latestAcademic?.spi || 0);
+      const performanceScore = latestCpi || profileCgpa || latestSpi || 0;
+
+      return {
+        ...mentee,
+        latestCpi: latestAcademic?.cpi || "",
+        latestSpi: latestAcademic?.spi || "",
+        latestAcademicSemester: latestAcademic?.semester || "",
+        performanceScore,
+        performanceSource: latestCpi ? "Latest CPI" : profileCgpa ? "Profile CGPA" : latestSpi ? "Latest SPI" : "No verified score",
+      };
+    });
+
+    return JSON.parse(JSON.stringify(roster));
   } catch (error) {
     console.error("Failed to fetch mentor roster:", error);
     return [];
@@ -1261,6 +2344,8 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
 
     // 2. Package the text data
     const updateData: any = {
+      fullName: formData.get("fullName"),
+      rollNo: formData.get("rollNo"),
       department: formData.get("department"),
       phone: formData.get("phone"),
       bloodGroup: formData.get("bloodGroup"),
@@ -1323,6 +2408,112 @@ export async function getMenteeProfile(userId: string) {
     return null;
   }
 }
+
+// ==========================================
+// 37.5. Get Latest Academic Record
+// ==========================================
+export async function getLatestAcademicRecord(studentId: string) {
+  try {
+    const adminClient = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
+      .setKey(process.env.NEXT_APPWRITE_KEY!);
+
+    const databases = new Databases(adminClient);
+
+    const academicsRes = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", studentId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(1)
+      ]
+    );
+
+    return academicsRes.documents.length > 0 ? JSON.parse(JSON.stringify(academicsRes.documents[0])) : null;
+  } catch (error) {
+    console.error("Failed to fetch latest academic record:", error);
+    return null;
+  }
+}
+
+// ==========================================
+// 37.6. Get Academic Records With Access Check
+// ==========================================
+export async function getAcademicRecordsForProfile(studentId: string) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) return [];
+
+    const adminDatabases = createAdminDatabases();
+
+    const student = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId
+    );
+
+    const currentProfile = await getProfileByEmail(user.email);
+    const isOwnProfile = student.email?.toLowerCase() === user.email.toLowerCase();
+    const isAssignedMentor = currentProfile?.role === "mentor" && student.mentorId === currentProfile.$id;
+
+    if (!isOwnProfile && !isAssignedMentor) return [];
+
+    const academicsRes = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", studentId),
+        Query.orderDesc("$createdAt")
+      ]
+    );
+
+    return JSON.parse(JSON.stringify(academicsRes.documents));
+  } catch (error) {
+    console.error("Failed to fetch academic records:", error);
+    return [];
+  }
+}
+
+// ==========================================
+// 37.7. Get Achievement Records With Access Check
+// ==========================================
+export async function getAchievementRecordsForProfile(studentId: string) {
+  try {
+    const user = await getLoggedInUser();
+    if (!user) return [];
+
+    const adminDatabases = createAdminDatabases();
+
+    const student = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      studentId
+    );
+
+    const currentProfile = await getProfileByEmail(user.email);
+    const isOwnProfile = student.email?.toLowerCase() === user.email.toLowerCase();
+    const isAssignedMentor = currentProfile?.role === "mentor" && student.mentorId === currentProfile.$id;
+
+    if (!isOwnProfile && !isAssignedMentor) return [];
+
+    const achievementsRes = await adminDatabases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      [
+        Query.equal("studentId", studentId),
+        Query.orderDesc("$createdAt")
+      ]
+    );
+
+    return JSON.parse(JSON.stringify(achievementsRes.documents));
+  } catch (error) {
+    console.error("Failed to fetch achievement records:", error);
+    return [];
+  }
+}
+
 
 // ==========================================
 // 38. Exact-Match Advisory Import (Admin)

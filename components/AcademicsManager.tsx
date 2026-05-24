@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { uploadAcademicRecord, updateAcademicStatus } from "@/lib/actions/student.actions";
+import StyledFileInput from "@/components/StyledFileInput";
 
 export default function AcademicsManager({ initialRecords, profileId, isMentor }: any) {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,32 +42,32 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
     <div className="space-y-8">
       {/* 1. MENTEE UPLOAD FORM (Hidden from Mentors) */}
       {!isMentor && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h3 className="font-bold text-slate-800 text-lg mb-4">Upload Semester Results</h3>
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-bold text-slate-800">Upload Semester Results</h3>
           <form onSubmit={handleUpload} className="space-y-4">
-            {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+            {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Semester</label>
-                <input required name="semester" type="number" min="1" max="8" className="w-full p-2.5 border border-slate-200 rounded-lg outline-none" placeholder="e.g. 3" />
+                <input required name="semester" type="number" min="1" max="8" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 3" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SPI (Current)</label>
-                <input required name="spi" type="number" step="0.01" className="w-full p-2.5 border border-slate-200 rounded-lg outline-none" placeholder="e.g. 8.5" />
+                <input required name="spi" type="number" step="0.01" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPI (Cumulative)</label>
-                <input required name="cpi" type="number" step="0.01" className="w-full p-2.5 border border-slate-200 rounded-lg outline-none" placeholder="e.g. 8.2" />
+                <input required name="cpi" type="number" step="0.01" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.2" />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Marksheet Document (PDF/Image)</label>
-              <input required name="file" type="file" accept="image/*,.pdf" className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
+              <StyledFileInput name="file" accept="image/*,.pdf" required label="Choose marksheet" />
             </div>
 
-            <button disabled={isLoading} type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">
+            <button disabled={isLoading} type="submit" className="rounded-lg bg-blue-600 px-6 py-2.5 font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50">
               {isLoading ? "Uploading securely..." : "Submit for Verification"}
             </button>
           </form>
@@ -74,7 +75,7 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
       )}
 
       {/* 2. ACADEMIC RECORDS TABLE */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="p-6 border-b border-slate-100">
           <h3 className="font-bold text-slate-800 text-lg">Official Academic Records</h3>
         </div>

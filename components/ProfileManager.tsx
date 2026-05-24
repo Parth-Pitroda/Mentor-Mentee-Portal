@@ -26,7 +26,7 @@ export default function ProfileManager({ profileData, mentorName, isOwnProfile }
       setIsEditing(false);
       window.location.reload();
     } else {
-      setError(result.error);
+      setError(result.error || "A server error occurred. Please try again.");
       setIsLoading(false);
     }
   };

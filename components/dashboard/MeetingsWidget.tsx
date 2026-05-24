@@ -21,7 +21,13 @@ export default function MeetingsWidget({
     e.preventDefault();
     setIsLoading(true);
     
-    await logMeeting(studentId, formData.date, formData.topic);
+    await logMeeting({
+      studentId,
+      date: formData.date,
+      topic: formData.topic,
+      mentorName: "Faculty Mentor",
+      description: formData.topic,
+    });
     
     setFormData({ date: today, topic: "" });
     setIsAdding(false);

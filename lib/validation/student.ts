@@ -26,3 +26,4 @@ export const StudentOnboardingSchema = z.object({
 });
 
 export type StudentFormValues = z.infer<typeof StudentOnboardingSchema>;
+export type StudentFormInput = z.input<typeof StudentOnboardingSchema>;

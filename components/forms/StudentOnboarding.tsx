@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { StudentOnboardingSchema, StudentFormValues } from "@/lib/validation/student";
+import { StudentOnboardingSchema, StudentFormInput, StudentFormValues } from "@/lib/validation/student";
 import { createStudentProfile } from "@/lib/actions/student.actions";
 
 export default function StudentOnboarding() {
@@ -17,14 +17,14 @@ export default function StudentOnboarding() {
     handleSubmit,
     trigger,
     formState: { errors },
-  } = useForm<StudentFormValues>({
+  } = useForm<StudentFormInput, unknown, StudentFormValues>({
     resolver: zodResolver(StudentOnboardingSchema),
     mode: "onChange",
   });
 
   // Handle moving to the next step with validation
   const nextStep = async () => {
-    let fieldsToValidate: any[] = [];
+    let fieldsToValidate: (keyof StudentFormInput)[] = [];
     if (step === 1) fieldsToValidate = ["fullName", "rollNumber", "phone", "department"];
     if (step === 2) fieldsToValidate = ["fatherName", "fatherPhone", "fatherOccupation", "motherName", "motherPhone", "motherOccupation"];
     
@@ -36,13 +36,14 @@ export default function StudentOnboarding() {
 
   // Handle the final submission to Appwrite
   const onSubmit = async (values: StudentFormValues) => {
+  setIsSubmittingForm(true);
   const result = await createStudentProfile(values);
 
   if (result.success) {
-    // This tells the browser to go to the new dashboard immediately
-    window.location.href = `/dashboard/${result.profileId}`;
+    router.push(`/dashboard/${result.profileId}`);
   } else {
     alert("Error: " + result.error);
+    setIsSubmittingForm(false);
   }
 };
   return (

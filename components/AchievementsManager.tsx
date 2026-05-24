@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { uploadAchievement, updateAchievementStatus } from "@/lib/actions/student.actions";
+import StyledFileInput from "@/components/StyledFileInput";
 
 export default function AchievementsManager({ initialRecords, profileId, isMentor }: any) {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,19 +42,19 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
     <div className="space-y-8">
       {/* 1. MENTEE UPLOAD FORM */}
       {!isMentor && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h3 className="font-bold text-slate-800 text-lg mb-4">Add New Achievement</h3>
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-bold text-slate-800">Add New Achievement</h3>
           <form onSubmit={handleUpload} className="space-y-4">
-            {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+            {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
-                <input required name="title" type="text" className="w-full p-2.5 border border-slate-200 rounded-lg outline-none" placeholder="e.g. Smart India Hackathon Winner" />
+                <input required name="title" type="text" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Smart India Hackathon Winner" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
-                <select required name="category" className="w-full p-2.5 border border-slate-200 rounded-lg outline-none bg-white">
+                <select required name="category" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Category...</option>
                   <option value="Hackathon">Hackathon</option>
                   <option value="Internship">Internship</option>
@@ -66,15 +67,15 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description / Details</label>
-              <textarea required name="description" rows={3} className="w-full p-2.5 border border-slate-200 rounded-lg outline-none" placeholder="Briefly describe your achievement..." />
+              <textarea required name="description" rows={3} className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Briefly describe your achievement..." />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proof Document (Optional Image/PDF)</label>
-              <input name="file" type="file" accept="image/*,.pdf" className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
+              <StyledFileInput name="file" accept="image/*,.pdf" label="Choose proof" />
             </div>
 
-            <button disabled={isLoading} type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">
+            <button disabled={isLoading} type="submit" className="rounded-lg bg-blue-600 px-6 py-2.5 font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50">
               {isLoading ? "Saving..." : "Submit Achievement"}
             </button>
           </form>
@@ -82,7 +83,7 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
       )}
 
       {/* 2. ACHIEVEMENTS TABLE */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="p-6 border-b border-slate-100">
           <h3 className="font-bold text-slate-800 text-lg">Verified Achievements</h3>
         </div>

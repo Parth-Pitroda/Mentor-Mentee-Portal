@@ -1,3 +1,11 @@
+export interface UserProfile {
+  $id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  department?: string;
+}
+
 export interface MenteeProfile extends UserProfile {
   rollNumber: string;
   parentalInfo: {
@@ -18,9 +26,18 @@ export interface AcademicRecord {
 }
 
 export interface Meeting {
+  $id?: string;
   date: string;
-  mode: 'ONLINE' | 'OFFLINE';
-  mentorId: string;
-  menteeId: string;
-  discussionNotes: string;
+  topic?: string;
+  mode?: 'ONLINE' | 'OFFLINE';
+  meetingMode?: 'ONLINE' | 'OFFLINE';
+  meetingLink?: string;
+  mentorId?: string;
+  menteeId?: string;
+  studentId?: string;
+  scheduledTime?: string;
+  agenda?: string;
+  discussionNotes?: string;
+  description?: string;
+  status?: "Requested" | "Confirmed" | "Scheduled" | "Pending" | "Verified" | "Rejected";
 }
