@@ -20,12 +20,9 @@ export default function SignInPage() {
     try {
       const response = await signInUser(formData);
       
-      if (response && response.secret) {
-        // 1. Save the session cookie securely
-        document.cookie = `appwrite-session=${response.secret}; path=/; max-age=604800; SameSite=Lax`;
+      if (response && !response.error) {
         toast.success("Login successful!", { id: toastId });
         
-        // 2. UPGRADED: Smart Routing based on Database Role!
         setTimeout(() => {
           if (response.role === "admin" || response.role === "coordinator") {
             window.location.href = `/admin-dashboard`; // ➔ Route to Admin

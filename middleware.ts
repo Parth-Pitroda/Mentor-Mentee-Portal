@@ -5,7 +5,11 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // 1. Define which routes require authentication
-  const isProtectedRoute = path.startsWith("/dashboard") || path.startsWith("/admin-dashboard");
+  const isProtectedRoute =
+    path.startsWith("/dashboard") ||
+    path.startsWith("/mentor-dashboard") ||
+    path.startsWith("/admin-dashboard") ||
+    path.startsWith("/onboarding");
   const isPublicRoute = path === "/sign-in" || path === "/sign-up" || path === "/";
 
   // 2. Look for the Appwrite Session Cookie

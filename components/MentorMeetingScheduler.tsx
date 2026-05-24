@@ -260,6 +260,18 @@ export default function MentorMeetingScheduler({ mentees = [] }: { mentees?: Sch
           </div>
         )}
 
+        {mode === "OFFLINE" && (
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Venue / Room</label>
+            <input
+              name="venue"
+              type="text"
+              placeholder="Faculty cabin, lab, classroom..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+        )}
+
         <div className="md:col-span-2">
           <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Agenda</label>
           <textarea

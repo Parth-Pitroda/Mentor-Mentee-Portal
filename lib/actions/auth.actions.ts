@@ -20,6 +20,18 @@ function createSessionClient(sessionSecret: string) {
     .setSession(sessionSecret); // NO API KEY!
 }
 
+function canSelfRegisterAsMentor(email: string) {
+  const allowedDomains = (process.env.MENTOR_EMAIL_DOMAINS || "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedDomains.length === 0) return false;
+
+  const emailDomain = email.toLowerCase().trim().split("@")[1] || "";
+  return allowedDomains.includes(emailDomain);
+}
+
 // ==========================================
 // SIGN UP LOGIC (UPGRADED WITH REDIRECT)
 // ==========================================
@@ -42,15 +54,8 @@ export async function signUpUser(formData: FormData) {
     const sessionClient = createSessionClient(session.secret);
     const sessionDatabases = new Databases(sessionClient);
 
-    // 🧠 THE DYNAMIC ROLE ASSIGNMENT BRAIN
     const emailLower = email.toLowerCase().trim();
-    const emailPrefix = emailLower.split('@')[0];
-    
-    // Regex test: Does the prefix contain ANY number? (\d means digit)
-    const hasNumbers = /\d/.test(emailPrefix);
-    
-    // If it has a number (like 24bcp413d), they are a mentee. Otherwise, a mentor.
-    assignedRole = hasNumbers ? "mentee" : "mentor";
+    assignedRole = canSelfRegisterAsMentor(emailLower) ? "mentor" : "mentee";
 
     await sessionDatabases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -72,7 +77,8 @@ export async function signUpUser(formData: FormData) {
       path: "/",
       httpOnly: true,
       sameSite: "strict",
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
     });
 
   } catch (error: any) {
@@ -131,19 +137,19 @@ export async function signInUser(formData: FormData) {
       path: "/",
       httpOnly: true,
       sameSite: "strict",
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return { 
       userId: actualProfileId,
-      secret: session.secret,
       role: userRole, 
       error: null 
     };
 
   } catch (error: any) {
     console.error("Appwrite Login Error:", error.message);
-    return { userId: null, secret: null, role: null, error: error.message };
+    return { userId: null, role: null, error: error.message };
   }
 }
 

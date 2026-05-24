@@ -74,6 +74,110 @@ async function getCurrentProfileForUser(adminDatabases: Databases, email: string
   return profiles.documents[0] || null;
 }
 
+type ProfileDocument = {
+  $id: string;
+  email?: string;
+  role?: string;
+  mentorId?: string;
+  fullName?: string;
+  [key: string]: unknown;
+};
+
+async function getCurrentProfileScope(adminDatabases: Databases) {
+  const user = await getLoggedInUser();
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const profile = await getCurrentProfileForUser(adminDatabases, user.email) as ProfileDocument | null;
+  if (!profile) {
+    throw new Error("Your profile could not be found.");
+  }
+
+  return { user, profile };
+}
+
+async function requireCurrentRole(adminDatabases: Databases, allowedRoles: string[]) {
+  const scope = await getCurrentProfileScope(adminDatabases);
+  if (!allowedRoles.includes(scope.profile.role || "")) {
+    throw new Error("You do not have permission to perform this action.");
+  }
+
+  return scope;
+}
+
+async function requireAdminOrCoordinator(adminDatabases: Databases) {
+  return requireCurrentRole(adminDatabases, ["admin", "coordinator"]);
+}
+
+async function requireSelfProfile(adminDatabases: Databases, profileId: string) {
+  const scope = await getCurrentProfileScope(adminDatabases);
+  if (scope.profile.$id !== profileId && scope.user.$id !== profileId) {
+    throw new Error("You can only update your own profile.");
+  }
+
+  return scope;
+}
+
+async function requireAssignedMentorForStudent(adminDatabases: Databases, studentId: string) {
+  const scope = await requireCurrentRole(adminDatabases, ["mentor"]);
+  const student = await adminDatabases.getDocument(
+    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+    process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+    studentId
+  ) as ProfileDocument;
+
+  if (student.mentorId !== scope.profile.$id && student.mentorId !== scope.user.$id) {
+    throw new Error("Only the assigned mentor can perform this action.");
+  }
+
+  return { ...scope, student };
+}
+
+async function requireMentorScope(adminDatabases: Databases, mentorId: string) {
+  const scope = await requireCurrentRole(adminDatabases, ["mentor"]);
+  if (mentorId !== scope.profile.$id && mentorId !== scope.user.$id) {
+    throw new Error("You can only access your own mentor workspace.");
+  }
+
+  return scope;
+}
+
+async function requireSelfOrAssignedMentor(adminDatabases: Databases, studentId: string) {
+  const scope = await getCurrentProfileScope(adminDatabases);
+  if (scope.profile.role === "admin" || scope.profile.role === "coordinator") {
+    return scope;
+  }
+
+  if (scope.profile.$id === studentId || scope.user.$id === studentId) {
+    return scope;
+  }
+
+  if (scope.profile.role === "mentor") {
+    await requireAssignedMentorForStudent(adminDatabases, studentId);
+    return scope;
+  }
+
+  throw new Error("You do not have permission to access this student.");
+}
+
+function validateUploadFile(file: File | null, options: { required: boolean; maxBytes: number; allowedTypes: string[] }) {
+  if (!file || file.size === 0 || file.name === "undefined") {
+    if (options.required) throw new Error("Please select a valid file.");
+    return null;
+  }
+
+  if (file.size > options.maxBytes) {
+    throw new Error(`File must be ${Math.floor(options.maxBytes / (1024 * 1024))}MB or smaller.`);
+  }
+
+  if (!options.allowedTypes.includes(file.type)) {
+    throw new Error("Unsupported file type.");
+  }
+
+  return file;
+}
+
 function sortNotifications(notifications: NotificationPayload[]) {
   return notifications.sort((a, b) => {
     const aTime = new Date(a.timestamp || a.$createdAt || 0).getTime();
@@ -519,12 +623,15 @@ async function notifyAssignedMentor(studentId: string, message: string, type: st
 
 export async function getStudentProfile(profileId: string) {
   try {
-    const profile = await databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, profileId);
+    const adminDatabases = createAdminDatabases();
+    await requireSelfOrAssignedMentor(adminDatabases, profileId);
+
+    const profile = await adminDatabases.getDocument(DATABASE_ID, PROFILES_COLLECTION, profileId);
     
     let academics = null;
     try {
       const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!;
-      const acadList = await databases.listDocuments(
+      const acadList = await adminDatabases.listDocuments(
         DATABASE_ID, 
         ACADEMICS_COLLECTION, 
         [Query.equal("studentId", [profileId])]
@@ -762,15 +869,19 @@ export async function logMeeting(data: {
 // ==========================================
 export async function updateMeetingStatus(meetingId: string, newStatus: "Verified" | "Rejected", studentId: string) {
   try {
-    // 1. Initialize an ADMIN Client to bypass document ownership rules
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!); // This gives the server permission to edit ANY document
+    const adminDatabases = createAdminDatabases();
+    const meeting = await adminDatabases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
+      meetingId
+    );
 
-    const adminDatabases = new Databases(adminClient);
+    if (meeting.studentId !== studentId) {
+      throw new Error("Meeting and student do not match.");
+    }
 
-    // 2. Perform the update using the Admin privileges
+    await requireAssignedMentorForStudent(adminDatabases, studentId);
+
     await adminDatabases.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
@@ -1022,6 +1133,7 @@ export async function scheduleMentorMeeting(formData: FormData) {
     const time = String(formData.get("time") || "");
     const mode = String(formData.get("mode") || "OFFLINE").toUpperCase();
     const link = String(formData.get("link") || "").trim();
+    const venue = String(formData.get("venue") || "").trim();
     const agenda = String(formData.get("agenda") || "").trim();
     const recipientMode = String(formData.get("recipientMode") || "all");
     const selectedStudentIds = formData
@@ -1075,10 +1187,12 @@ export async function scheduleMentorMeeting(formData: FormData) {
     }
 
     const mentorName = mentorProfile?.fullName || user.name || "Faculty Mentor";
+    const reportVenue = mode === "ONLINE" ? (link || "Online") : (venue || "Offline");
     const description = [
       MENTOR_SCHEDULED_MEETING_MARKER,
       `Time: ${time}`,
       `Mode: ${mode === "ONLINE" ? "Online" : "Offline"}`,
+      `Venue: ${reportVenue}`,
       mode === "ONLINE" ? `Link: ${link}` : "",
       "",
       "Agenda:",
@@ -1283,11 +1397,17 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
 
     const storage = new Storage(adminClient);
     const databases = new Databases(adminClient);
+    await requireSelfProfile(databases, studentId);
 
     const semester = formData.get("semester") as string;
     const spi = formData.get("spi") as string;
     const cpi = formData.get("cpi") as string;
-    const file = formData.get("file") as File;
+    const file = validateUploadFile(formData.get("file") as File | null, {
+      required: true,
+      maxBytes: 5 * 1024 * 1024,
+      allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
+    });
+    if (!file) throw new Error("Please select a valid file.");
 
     // 2. THE FIX: Convert the Web File into a Node Buffer for Appwrite
     const arrayBuffer = await file.arrayBuffer();
@@ -1338,12 +1458,18 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
 // ==========================================
 export async function updateAcademicStatus(recordId: string, newStatus: "Verified" | "Rejected", studentId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
+    const databases = createAdminDatabases();
+    const record = await databases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
+      recordId
+    );
 
-    const databases = new Databases(adminClient);
+    if (record.studentId !== studentId) {
+      throw new Error("Academic record and student do not match.");
+    }
+
+    await requireAssignedMentorForStudent(databases, studentId);
 
     await databases.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1383,16 +1509,21 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
 
     const storage = new Storage(adminClient);
     const databases = new Databases(adminClient);
+    await requireSelfProfile(databases, studentId);
 
     const title = formData.get("title") as string;
     const category = formData.get("category") as string;
     const description = formData.get("description") as string;
-    const file = formData.get("file") as File | null;
+    const file = validateUploadFile(formData.get("file") as File | null, {
+      required: false,
+      maxBytes: 5 * 1024 * 1024,
+      allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
+    });
 
     let fileId = null;
 
     // Only upload to storage if a proof file was actually attached
-    if (file && file.size > 0 && file.name !== "undefined") {
+    if (file) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
@@ -1442,12 +1573,18 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
 // ==========================================
 export async function updateAchievementStatus(achievementId: string, newStatus: "Verified" | "Rejected", studentId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
+    const databases = createAdminDatabases();
+    const achievement = await databases.getDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
+      achievementId
+    );
 
-    const databases = new Databases(adminClient);
+    if (achievement.studentId !== studentId) {
+      throw new Error("Achievement and student do not match.");
+    }
+
+    await requireAssignedMentorForStudent(databases, studentId);
 
     await databases.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1502,6 +1639,7 @@ export async function updateProfileDetails(profileId: string, department: string
       .setKey(process.env.NEXT_APPWRITE_KEY!);
 
     const databases = new Databases(adminClient);
+    await requireSelfProfile(databases, profileId);
 
     const skillsArray = validSkills
       .split(",")
@@ -1533,12 +1671,25 @@ export async function updateProfileDetails(profileId: string, department: string
 // ==========================================
 export async function assignMentor(studentId: string, mentorId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
-    const databases = new Databases(adminClient);
+    const [student, mentor] = await Promise.all([
+      databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        studentId
+      ),
+      databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        mentorId
+      ),
+    ]);
+
+    if (student.role !== "mentee" || mentor.role !== "mentor") {
+      throw new Error("Please select a valid student and mentor.");
+    }
 
     // Update the student's profile with the new mentorId
     await databases.updateDocument(
@@ -1567,6 +1718,7 @@ export async function bulkImportStudents(studentList: Array<{ fullName: string, 
       .setKey(process.env.NEXT_APPWRITE_KEY!);
 
     const databases = new Databases(adminClient);
+    await requireAdminOrCoordinator(databases);
     const users = new Users(adminClient);
 
     let successCount = 0;
@@ -1729,12 +1881,8 @@ export async function getPendingApprovals(mentorId: string) {
 
 export async function toggleStudentVerification(studentId: string, currentStatus: boolean) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     // Flip the status to the opposite of what it currently is
     await databases.updateDocument(
@@ -1762,12 +1910,8 @@ export async function toggleStudentVerification(studentId: string, currentStatus
 // ==========================================
 export async function getSystemAnalytics() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
     const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 
     // We use Promise.all to fetch all the counts simultaneously for maximum speed!
@@ -1808,12 +1952,8 @@ export async function createGlobalNotice(formData: FormData) {
     const title = formData.get("title") as string;
     const content = formData.get("content") as string;
 
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     await databases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1835,12 +1975,8 @@ export async function createGlobalNotice(formData: FormData) {
 // ==========================================
 export async function getAllMentors() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     const mentors = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1860,12 +1996,8 @@ export async function getAllMentors() {
 // ==========================================
 export async function getVerifiedStudentsForExport() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     const students = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1894,12 +2026,8 @@ export async function getVerifiedStudentsForExport() {
 // ==========================================
 export async function getAllProfiles() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     const profiles = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -1919,12 +2047,11 @@ export async function getAllProfiles() {
 // ==========================================
 export async function deleteUserProfile(profileId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    const scope = await requireAdminOrCoordinator(databases);
+    if (scope.profile.$id === profileId || scope.user.$id === profileId) {
+      throw new Error("You cannot delete your own account.");
+    }
 
     // Completely remove the profile from the database
     await databases.deleteDocument(
@@ -1946,12 +2073,8 @@ export async function deleteUserProfile(profileId: string) {
 // ==========================================
 export async function getGlobalSettings() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
     const SETTINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!;
 
     const settingsList = await databases.listDocuments(
@@ -1986,12 +2109,8 @@ export async function updateGlobalSettings(settingsId: string, formData: FormDat
     const activeTerm = formData.get("activeTerm") as string;
     const academicYear = formData.get("academicYear") as string;
 
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     await databases.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -2013,12 +2132,8 @@ export async function updateGlobalSettings(settingsId: string, formData: FormDat
 // ==========================================
 export async function getDepartmentAnalytics() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     // Fetch all mentees
     const profiles = await databases.listDocuments(
@@ -2062,12 +2177,8 @@ export async function getDepartmentAnalytics() {
 // ==========================================
 export async function getUnassignedStudents() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     // Fetch all mentees
     const mentees = await databases.listDocuments(
@@ -2097,12 +2208,25 @@ export async function assignMentorToStudent(studentId: string, formData: FormDat
     
     if (!mentorId) throw new Error("Please select a mentor.");
 
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
-    const databases = new Databases(adminClient);
+    const [student, mentor] = await Promise.all([
+      databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        studentId
+      ),
+      databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        mentorId
+      ),
+    ]);
+
+    if (student.role !== "mentee" || mentor.role !== "mentor") {
+      throw new Error("Please select a valid student and mentor.");
+    }
 
     // Update the student's profile with the new mentorId
     await databases.updateDocument(
@@ -2130,6 +2254,7 @@ export async function importStudentsFromCSV(formData: FormData) {
   try {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) throw new Error("Please select a valid CSV file.");
+    if (file.size > 2 * 1024 * 1024) throw new Error("CSV file must be 2MB or smaller.");
 
     // Read the file content as text
     const text = await file.text();
@@ -2143,6 +2268,7 @@ export async function importStudentsFromCSV(formData: FormData) {
       .setKey(process.env.NEXT_APPWRITE_KEY!);
 
     const databases = new Databases(adminClient);
+    await requireAdminOrCoordinator(databases);
 
     // Loop through all lines EXCEPT the first one (which contains the headers)
     for (let i = 1; i < lines.length; i++) {
@@ -2180,12 +2306,8 @@ export async function importStudentsFromCSV(formData: FormData) {
 // ==========================================
 export async function getSystemActivityLog() {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireAdminOrCoordinator(databases);
 
     // 1. Fetch latest notices
     const noticesList = await databases.listDocuments(
@@ -2324,12 +2446,17 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
 
     const databases = new Databases(adminClient);
     const storage = new Storage(adminClient); // Need the storage service!
+    await requireSelfProfile(databases, userId);
 
     let profilePictureId = null;
 
     // 1. Process and upload the image if it exists
-    const file = formData.get("profilePicture") as File | null;
-    if (file && file.size > 0 && file.name !== "undefined") {
+    const file = validateUploadFile(formData.get("profilePicture") as File | null, {
+      required: false,
+      maxBytes: 2 * 1024 * 1024,
+      allowedTypes: ["image/jpeg", "image/png"],
+    });
+    if (file) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
@@ -2389,12 +2516,8 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
 // ==========================================
 export async function getMenteeProfile(userId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireSelfOrAssignedMentor(databases, userId);
 
     const profile = await databases.getDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -2414,12 +2537,8 @@ export async function getMenteeProfile(userId: string) {
 // ==========================================
 export async function getLatestAcademicRecord(studentId: string) {
   try {
-    const adminClient = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(adminClient);
+    const databases = createAdminDatabases();
+    await requireSelfOrAssignedMentor(databases, studentId);
 
     const academicsRes = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -2522,6 +2641,7 @@ export async function importMasterAdvisoryList(formData: FormData) {
   try {
     const file = formData.get("file") as File;
     if (!file || file.size === 0) throw new Error("Please select a valid CSV file.");
+    if (file.size > 2 * 1024 * 1024) throw new Error("CSV file must be 2MB or smaller.");
 
     const text = await file.text();
     const lines = text.split(/\r?\n/); // Split by row
@@ -2533,6 +2653,7 @@ export async function importMasterAdvisoryList(formData: FormData) {
 
     const databases = new Databases(adminClient);
     const users = new Users(adminClient);
+    await requireAdminOrCoordinator(databases);
 
     // 1. Fetch all Mentors currently in the database to match against
     const mentorsResponse = await databases.listDocuments(
