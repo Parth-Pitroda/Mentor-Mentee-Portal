@@ -1,6 +1,6 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
+import { getAchievementRecordsForProfile, checkUserRole } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
-import { Client, Databases, Query } from "node-appwrite";
 import AchievementsManager from "@/components/AchievementsManager";
 
 export default async function AchievementsPage({ 
@@ -13,40 +13,12 @@ export default async function AchievementsPage({
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
-  let achievements = [];
-  let isMentor = false;
+  // ✅ Securely check the role using our new helper
+  const role = await checkUserRole(user.email);
+  const isMentor = role === "mentor" || role === "admin" || role === "coordinator";
 
-  try {
-    const client = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(client);
-
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-    const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
-    const ACHIEVEMENTS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!; 
-
-    // Check if user is a mentor
-    const currentUserProfile = await databases.listDocuments(DATABASE_ID, PROFILES_COLLECTION, [
-      Query.equal("email", [user.email.toLowerCase()])
-    ]);
-    
-    if (currentUserProfile.total > 0 && currentUserProfile.documents[0].role === "mentor") {
-      isMentor = true;
-    }
-
-    // Fetch achievements
-    const achievementsRes = await databases.listDocuments(DATABASE_ID, ACHIEVEMENTS_COLLECTION, [
-      Query.equal("studentId", profileId),
-      Query.orderDesc("$createdAt") 
-    ]);
-    achievements = JSON.parse(JSON.stringify(achievementsRes.documents));
-    
-  } catch (error) {
-    console.error("Achievements data fetch failed:", error);
-  }
+  // ✅ THE DRY FIX: One line to fetch the data instead of 25!
+  const achievements = await getAchievementRecordsForProfile(profileId) || [];
 
   return (
     <div className="animate-in fade-in duration-500">

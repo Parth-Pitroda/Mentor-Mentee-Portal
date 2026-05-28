@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { uploadAchievement, updateAchievementStatus } from "@/lib/actions/student.actions";
 import StyledFileInput from "@/components/StyledFileInput";
+import { useRouter } from "next/navigation";
 
 export default function AchievementsManager({ initialRecords, profileId, isMentor }: any) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,7 +19,7 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
     const result = await uploadAchievement(formData, profileId);
 
     if (result.success) {
-      window.location.reload();
+      router.refresh();
     } else {
       setError(result.error);
       setIsLoading(false);
@@ -27,7 +29,7 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
   const handleVerification = async (recordId: string, status: "Verified" | "Rejected") => {
     setIsLoading(true);
     await updateAchievementStatus(recordId, status, profileId);
-    window.location.reload();
+    router.refresh();
   };
 
   // Helper to generate the Appwrite file viewing URL securely

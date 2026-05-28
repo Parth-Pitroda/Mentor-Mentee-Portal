@@ -1,6 +1,6 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
+import { getAcademicRecordsForProfile, checkUserRole } from "@/lib/actions/student.actions"; // ✅ Action imported
 import { redirect } from "next/navigation";
-import { Client, Databases, Query } from "node-appwrite"; // <-- Only using the Node SDK!
 import AcademicsManager from "@/components/AcademicsManager";
 
 export default async function AcademicsPage({ 
@@ -13,41 +13,11 @@ export default async function AcademicsPage({
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
-  let academicRecords = [];
-  let isMentor = false;
-
-  try {
-    // 1. Securely initialize the Server Client inside the component
-    const client = new Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-      .setKey(process.env.NEXT_APPWRITE_KEY!);
-
-    const databases = new Databases(client);
-
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-    const PROFILES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
-    const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!; 
-
-    // 2. Role Check
-    const currentUserProfile = await databases.listDocuments(DATABASE_ID, PROFILES_COLLECTION, [
-      Query.equal("email", [user.email.toLowerCase()])
-    ]);
-    
-    if (currentUserProfile.total > 0 && currentUserProfile.documents[0].role === "mentor") {
-      isMentor = true;
-    }
-
-    // 3. Fetch Student's Academic Records
-    const academicsRes = await databases.listDocuments(DATABASE_ID, ACADEMICS_COLLECTION, [
-      Query.equal("studentId", profileId),
-      Query.orderDesc("$createdAt") 
-    ]);
-    academicRecords = JSON.parse(JSON.stringify(academicsRes.documents));
-    
-  } catch (error) {
-    console.error("Academics data fetch failed:", error);
-  }
+  const role = await checkUserRole(user.email);
+  const isMentor = role === "mentor" || role === "admin" || role === "coordinator";
+  
+  // ✅ THE DRY FIX: One line to fetch the data instead of 25!
+  const academicRecords = await getAcademicRecordsForProfile(profileId) || [];
 
   return (
     <div className="animate-in fade-in duration-500">

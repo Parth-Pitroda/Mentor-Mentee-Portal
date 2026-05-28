@@ -27,15 +27,26 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
-  // Fetch all necessary data for the dashboard
-  const analytics = await getSystemAnalytics();
-  const mentors = await getAllMentors();
-  const notices = await getLatestNotices(5);
-  const exportData = await getVerifiedStudentsForExport();
-  const allProfiles = await getAllProfiles();
-  const systemSettings = await getGlobalSettings();
-  const deptData = await getDepartmentAnalytics();
-  const unassignedStudents = await getUnassignedStudents();
+// ✅ AFTER: Concurrent Fetching (Lightning Fast!)
+  const [
+    analytics, 
+    mentors, 
+    notices, 
+    exportData, 
+    allProfiles, 
+    systemSettings, 
+    deptData, 
+    unassignedStudents
+  ] = await Promise.all([
+    getSystemAnalytics(),
+    getAllMentors(),
+    getLatestNotices(5),
+    getVerifiedStudentsForExport(),
+    getAllProfiles(),
+    getGlobalSettings(),
+    getDepartmentAnalytics(),
+    getUnassignedStudents()
+  ]);
 
   return (
     <div className="flex min-h-screen bg-slate-50">

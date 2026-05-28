@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { updateProfileDetails } from "@/lib/actions/student.actions";
+import { useRouter } from "next/navigation";
 
 export default function ProfileManager({ profileData, mentorName, isOwnProfile }: any) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +26,7 @@ export default function ProfileManager({ profileData, mentorName, isOwnProfile }
 
     if (result.success) {
       setIsEditing(false);
-      window.location.reload();
+      router.refresh();
     } else {
       setError(result.error || "A server error occurred. Please try again.");
       setIsLoading(false);

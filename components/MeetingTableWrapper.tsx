@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { updateMeetingStatus } from "@/lib/actions/student.actions";
+import { useRouter } from "next/navigation";
 
 export default function MeetingTableWrapper({ initialMeetings, profileId, isMentor = false }: any) {
+  const router = useRouter();
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -13,7 +15,7 @@ export default function MeetingTableWrapper({ initialMeetings, profileId, isMent
     await updateMeetingStatus(selectedLog.$id, status, profileId);
     setIsUpdating(false);
     setSelectedLog(null);
-    window.location.reload(); // Refresh to see the new badge color
+    router.refresh();
   };
 
   const getStatusClass = (status: string) => {

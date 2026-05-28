@@ -1,4 +1,5 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
+
 import { 
   getPendingApprovals, 
   updateMeetingStatus, 
@@ -167,7 +168,6 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
               {academics.length === 0 ? <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-slate-500">No pending academic records to review.</p> : academics.map((acad: any) => (
                 <div key={acad.$id} className="flex flex-col justify-between gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center">
                   <div>
-                    {/* Fixed the naked number issue here! */}
                     <h3 className="font-bold text-slate-800 text-lg">
                       {String(acad.semester).toLowerCase().includes('semester') ? acad.semester : `Semester ${acad.semester}`}
                     </h3>

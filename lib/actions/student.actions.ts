@@ -1,6 +1,5 @@
 "use server";
 
-import { databases } from "@/lib/appwrite/config";
 import { revalidatePath } from "next/cache";
 import { InputFile } from "node-appwrite/file";
 import { Client, Databases, ID, Query, Storage, Users } from "node-appwrite";
@@ -658,7 +657,8 @@ export async function getStudentProfile(profileId: string) {
 // ==========================================
 export async function createStudentProfile(studentData: any) {
   try {
-    const newProfile = await databases.createDocument(
+    const adminDatabases = createAdminDatabases();
+    const newProfile = await adminDatabases.createDocument(
       DATABASE_ID,
       PROFILES_COLLECTION,
       ID.unique(),
@@ -667,7 +667,11 @@ export async function createStudentProfile(studentData: any) {
         email: studentData.email,
         role: "mentee",
         department: studentData.department,
-        bio: `Roll No: ${studentData.rollNumber} | Phone: ${studentData.phone}`,
+        
+        rollNo: studentData.rollNumber, 
+        phone: studentData.phone,
+        
+        bio: "", 
         isVerified: false,
         skills: [], 
       }
@@ -685,8 +689,9 @@ export async function createStudentProfile(studentData: any) {
 export async function getLatestNotices(limit = 5) {
   try {
     const NOTICES_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!; 
+    const adminDatabases = createAdminDatabases();
 
-    const notices = await databases.listDocuments(
+    const notices = await adminDatabases.listDocuments(
       DATABASE_ID,
       NOTICES_COLLECTION,
       [
@@ -706,7 +711,8 @@ export async function getLatestNotices(limit = 5) {
 // ==========================================
 export async function getAllStudents() {
   try {
-    const students = await databases.listDocuments(
+    const adminDatabases = createAdminDatabases();
+    const students = await adminDatabases.listDocuments(
       DATABASE_ID,
       PROFILES_COLLECTION,
       [
@@ -726,10 +732,10 @@ export async function getAllStudents() {
 // ==========================================
 export async function getAchievements(studentId: string) {
   try {
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const ACHIEVEMENTS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!;
-
-    const result = await databases.listDocuments(
+    const adminDatabases = createAdminDatabases();
+    
+    const result = await adminDatabases.listDocuments(
       DATABASE_ID,
       ACHIEVEMENTS_COLLECTION,
       [
@@ -749,10 +755,10 @@ export async function getAchievements(studentId: string) {
 // ==========================================
 export async function addAchievement(studentId: string, title: string, category: string) {
   try {
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const ACHIEVEMENTS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!;
-
-    await databases.createDocument(
+    const adminDatabases = createAdminDatabases();
+    
+    await adminDatabases.createDocument(
       DATABASE_ID,
       ACHIEVEMENTS_COLLECTION,
       ID.unique(),
@@ -763,7 +769,6 @@ export async function addAchievement(studentId: string, title: string, category:
       }
     );
 
-    // Refresh the dashboard to show the new achievement instantly
     revalidatePath(`/dashboard/${studentId}`);
     return JSON.parse(JSON.stringify({ success: true }));
   } catch (error) {
@@ -777,14 +782,13 @@ export async function addAchievement(studentId: string, title: string, category:
 // ==========================================
 export async function saveAcademics(studentId: string, year: string, gpa: number, documentId?: string) {
   try {
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const ACADEMICS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!;
-
-    // If they already have a record, update it. If not, create a new one!
+    const adminDatabases = createAdminDatabases();
+    
     if (documentId) {
-      await databases.updateDocument(DATABASE_ID, ACADEMICS_COLLECTION, documentId, { year, gpa });
+      await adminDatabases.updateDocument(DATABASE_ID, ACADEMICS_COLLECTION, documentId, { year, gpa });
     } else {
-      await databases.createDocument(DATABASE_ID, ACADEMICS_COLLECTION, ID.unique(), { studentId, year, gpa });
+      await adminDatabases.createDocument(DATABASE_ID, ACADEMICS_COLLECTION, ID.unique(), { studentId, year, gpa });
     }
 
     revalidatePath(`/dashboard/${studentId}`);
@@ -800,15 +804,15 @@ export async function saveAcademics(studentId: string, year: string, gpa: number
 // ==========================================
 export async function getMeetings(studentId: string) {
   try {
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
-
-    const result = await databases.listDocuments(
+    const adminDatabases = createAdminDatabases();
+    
+    const result = await adminDatabases.listDocuments(
       DATABASE_ID,
       MEETINGS_COLLECTION,
       [
         Query.equal("studentId", [studentId]),
-        Query.orderDesc("date") // Sort by newest date first
+        Query.orderDesc("date") 
       ]
     );
     return JSON.parse(JSON.stringify(result.documents));
@@ -829,10 +833,10 @@ export async function logMeeting(data: {
   description: string 
 }) {
   try {
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
     const MEETINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
-
-    const createdMeeting = await databases.createDocument(
+    const adminDatabases = createAdminDatabases();
+    
+    const createdMeeting = await adminDatabases.createDocument(
       DATABASE_ID,
       MEETINGS_COLLECTION,
       ID.unique(),
@@ -842,11 +846,10 @@ export async function logMeeting(data: {
         topic: data.topic,
         mentorName: data.mentorName,
         description: data.description,
-        status: "Pending" // Defaults to Pending until Mentor verifies
+        status: "Pending" 
       }
     );
 
-    // Refresh the page data automatically
     revalidatePath(`/dashboard/${data.studentId}/meetings`);
     revalidatePath("/mentor-dashboard/approvals");
 
@@ -865,13 +868,13 @@ export async function logMeeting(data: {
 }
 
 // ==========================================
-// 11. Update Meeting Status (Mentor Action)
+// 11. Update Meeting Status (Mentor Action) - 🚨 formData added for bind()
 // ==========================================
-export async function updateMeetingStatus(meetingId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+export async function updateMeetingStatus(meetingId: string, newStatus: "Verified" | "Rejected", studentId: string, formData?: FormData) {
   try {
     const adminDatabases = createAdminDatabases();
     const meeting = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       meetingId
     );
@@ -883,13 +886,12 @@ export async function updateMeetingStatus(meetingId: string, newStatus: "Verifie
     await requireAssignedMentorForStudent(adminDatabases, studentId);
 
     await adminDatabases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       meetingId,
       { status: newStatus }
     );
 
-    // 3. Clear Next.js cache for all relevant pages so the badge updates instantly
     revalidatePath(`/mentor-dashboard`);
     revalidatePath(`/dashboard/${studentId}/meetings`);
     revalidatePath(`/dashboard/${studentId}`);
@@ -928,8 +930,8 @@ export async function requestMeeting(studentId: string, formData: FormData) {
 
     const adminDatabases = createAdminDatabases();
     const profile = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId
     );
 
@@ -942,8 +944,8 @@ export async function requestMeeting(studentId: string, formData: FormData) {
     }
 
     const mentorProfile = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       profile.mentorId
     ).catch(() => null);
 
@@ -965,7 +967,7 @@ export async function requestMeeting(studentId: string, formData: FormData) {
     let createdMeeting;
     try {
       createdMeeting = await adminDatabases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         ID.unique(),
         richPayload
@@ -980,7 +982,7 @@ export async function requestMeeting(studentId: string, formData: FormData) {
         status: "Requested",
       };
       createdMeeting = await adminDatabases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         ID.unique(),
         compatiblePayload
@@ -1016,8 +1018,8 @@ export async function getMeetingRequests(mentorId: string) {
   try {
     const adminDatabases = createAdminDatabases();
     const menteesList = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("mentorId", [mentorId]), Query.limit(100)]
     );
 
@@ -1032,7 +1034,7 @@ export async function getMeetingRequests(mentorId: string) {
     });
 
     const requests = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       [
         Query.equal("studentId", menteeIds),
@@ -1065,14 +1067,14 @@ export async function respondToMeetingRequest(meetingId: string, response: "Conf
 
     const adminDatabases = createAdminDatabases();
     const meeting = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       meetingId
     );
 
     const student = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       meeting.studentId
     );
 
@@ -1087,7 +1089,7 @@ export async function respondToMeetingRequest(meetingId: string, response: "Conf
     }
 
     await adminDatabases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       meetingId,
       { 
@@ -1151,8 +1153,8 @@ export async function scheduleMentorMeeting(formData: FormData) {
 
     const adminDatabases = createAdminDatabases();
     const mentorProfile = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       user.$id
     ).catch(() => null);
 
@@ -1161,8 +1163,8 @@ export async function scheduleMentorMeeting(formData: FormData) {
     }
 
     const mentees = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [
         Query.equal("role", ["mentee"]),
         Query.equal("mentorId", user.$id),
@@ -1226,7 +1228,7 @@ export async function scheduleMentorMeeting(formData: FormData) {
       if (supportsRichPayload) {
         try {
           createdMeeting = await adminDatabases.createDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+            DATABASE_ID,
             process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
             ID.unique(),
             richPayload
@@ -1238,7 +1240,7 @@ export async function scheduleMentorMeeting(formData: FormData) {
 
       if (!createdMeeting) {
         createdMeeting = await adminDatabases.createDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          DATABASE_ID,
           process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
           ID.unique(),
           basePayload
@@ -1278,8 +1280,8 @@ export async function getMentorScheduledMeetings(mentorId: string) {
   try {
     const adminDatabases = createAdminDatabases();
     const mentees = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [
         Query.equal("role", ["mentee"]),
         Query.equal("mentorId", mentorId),
@@ -1305,7 +1307,7 @@ export async function getMentorScheduledMeetings(mentorId: string) {
     });
 
     const meetings = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       [
         Query.equal("studentId", menteeIds),
@@ -1342,13 +1344,13 @@ export async function updateScheduledMeetingAttendance(meetingId: string, studen
     const adminDatabases = createAdminDatabases();
     const [meeting, student] = await Promise.all([
       adminDatabases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         meetingId
       ),
       adminDatabases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        DATABASE_ID,
+        PROFILES_COLLECTION,
         studentId
       ),
     ]);
@@ -1362,7 +1364,7 @@ export async function updateScheduledMeetingAttendance(meetingId: string, studen
     }
 
     await adminDatabases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
       meetingId,
       { status: attended ? "Verified" : "Scheduled" }
@@ -1381,9 +1383,6 @@ export async function updateScheduledMeetingAttendance(meetingId: string, studen
     };
   }
 }
-
-
-// ... (Keep all your existing functions) ...
 
 // ==========================================
 // 12. Upload Academic Record & File (Mentee)
@@ -1409,20 +1408,18 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
     });
     if (!file) throw new Error("Please select a valid file.");
 
-    // 2. THE FIX: Convert the Web File into a Node Buffer for Appwrite
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const appwriteInputFile = InputFile.fromBuffer(buffer, file.name);
 
-    // 3. Upload using the new buffer
     const uploadedFile = await storage.createFile(
       process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID!,
       ID.unique(),
-      appwriteInputFile // <-- Use the converted file here!
+      appwriteInputFile 
     );
 
     const academicRecord = await databases.createDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       ID.unique(),
       {
@@ -1454,13 +1451,13 @@ export async function uploadAcademicRecord(formData: FormData, studentId: string
 }
 
 // ==========================================
-// 13. Verify/Reject Academic Record (Mentor)
+// 13. Verify/Reject Academic Record (Mentor) - 🚨 formData added for bind()
 // ==========================================
-export async function updateAcademicStatus(recordId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+export async function updateAcademicStatus(recordId: string, newStatus: "Verified" | "Rejected", studentId: string, formData?: FormData) {
   try {
     const databases = createAdminDatabases();
     const record = await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       recordId
     );
@@ -1472,7 +1469,7 @@ export async function updateAcademicStatus(recordId: string, newStatus: "Verifie
     await requireAssignedMentorForStudent(databases, studentId);
 
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       recordId,
       { status: newStatus }
@@ -1522,7 +1519,6 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
 
     let fileId = null;
 
-    // Only upload to storage if a proof file was actually attached
     if (file) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -1537,7 +1533,7 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
     }
 
     const achievement = await databases.createDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
       ID.unique(),
       {
@@ -1569,13 +1565,13 @@ export async function uploadAchievement(formData: FormData, studentId: string) {
 }
 
 // ==========================================
-// 15. Verify/Reject Achievement (Mentor)
+// 15. Verify/Reject Achievement (Mentor) - 🚨 formData added for bind()
 // ==========================================
-export async function updateAchievementStatus(achievementId: string, newStatus: "Verified" | "Rejected", studentId: string) {
+export async function updateAchievementStatus(achievementId: string, newStatus: "Verified" | "Rejected", studentId: string, formData?: FormData) {
   try {
     const databases = createAdminDatabases();
     const achievement = await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
       achievementId
     );
@@ -1587,7 +1583,7 @@ export async function updateAchievementStatus(achievementId: string, newStatus: 
     await requireAssignedMentorForStudent(databases, studentId);
 
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
       achievementId,
       { status: newStatus }
@@ -1629,7 +1625,6 @@ export async function updateProfileDetails(profileId: string, department: string
       };
     }
 
-    // Explicitly extract the data so TypeScript stops complaining!
     const validDepartment = validatedData.data.department;
     const validSkills = validatedData.data.skills;
 
@@ -1647,8 +1642,8 @@ export async function updateProfileDetails(profileId: string, department: string
       .filter((skill) => skill !== "");
 
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       profileId,
       { 
         department: validDepartment,
@@ -1675,26 +1670,17 @@ export async function assignMentor(studentId: string, mentorId: string) {
     await requireAdminOrCoordinator(databases);
 
     const [student, mentor] = await Promise.all([
-      databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        studentId
-      ),
-      databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        mentorId
-      ),
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, studentId),
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, mentorId),
     ]);
 
     if (student.role !== "mentee" || mentor.role !== "mentor") {
       throw new Error("Please select a valid student and mentor.");
     }
 
-    // Update the student's profile with the new mentorId
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId,
       { mentorId: mentorId }
     );
@@ -1724,39 +1710,33 @@ export async function bulkImportStudents(studentList: Array<{ fullName: string, 
     let successCount = 0;
     let errors = [];
 
-    // Process sequentially to respect API rate limits
     for (const student of studentList) {
       try {
         const emailLower = student.email.toLowerCase().trim();
 
-        // 1. Create Appwrite Auth Account (with a standardized default password)
-        // In a real production app, you might trigger a password reset email here instead
         const authUser = await users.create(
           ID.unique(),
           emailLower,
-          undefined, // phone
-          "Pdeu@2026", // Default password for all imported users
+          undefined, 
+          "Pdeu@2026", 
           student.fullName.trim()
         );
 
-        // 2. Create the Database Profile
         await databases.createDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+          DATABASE_ID,
+          PROFILES_COLLECTION,
           ID.unique(),
           {
             email: emailLower,
             fullName: student.fullName.trim(),
             department: student.department.trim(),
             role: "mentee",
-            isVerified: true // Auto-verify since an admin uploaded them
+            isVerified: true 
           }
         );
 
         successCount++;
       } catch (err: any) {
-        // If a single user fails (e.g. email already exists), we catch the error 
-        // but KEEP processing the rest of the CSV!
         errors.push(`Failed for ${student.email}: ${err.message}`);
       }
     }
@@ -1781,10 +1761,9 @@ export async function getAssignedMentees(mentorId: string) {
 
     const databases = new Databases(adminClient);
 
-    // Query the profiles collection to find all students who have this mentor's ID
     const rosterList = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [
         Query.equal("mentorId", [mentorId]),
         Query.equal("role", ["mentee"]),
@@ -1800,10 +1779,7 @@ export async function getAssignedMentees(mentorId: string) {
 }
 
 // ==========================================
-// 20. Fetch Pending Approvals (For Mentor Dashboard)
-// ==========================================
-// ==========================================
-// 20. Fetch ALL Pending Approvals (Meetings, Academics, Achievements)
+// 20. Fetch ALL Pending Approvals
 // ==========================================
 export async function getPendingApprovals(mentorId: string) {
   try {
@@ -1814,16 +1790,14 @@ export async function getPendingApprovals(mentorId: string) {
 
     const databases = new Databases(adminClient);
 
-    // 1. Get all mentees assigned to this mentor
     const menteesList = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("mentorId", [mentorId]), Query.limit(100)]
     );
 
     if (menteesList.total === 0) return { meetings: [], meetingRequests: [], academics: [], achievements: [] };
 
-    // 2. Map their IDs and Names so we know WHO submitted the request
     const menteeIds: string[] = [];
     const studentMap: Record<string, string> = {};
     
@@ -1832,31 +1806,29 @@ export async function getPendingApprovals(mentorId: string) {
       studentMap[doc.$id] = doc.fullName;
     });
 
-    // 3. Fetch ALL pending requests across all three collections simultaneously using Promise.all
     const [pendingMeetings, meetingRequests, pendingAcademics, pendingAchievements] = await Promise.all([
       databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       ),
       databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         [Query.equal("studentId", menteeIds), Query.equal("status", ["Requested"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       ),
       databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
         [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       ),
       databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
         [Query.equal("studentId", menteeIds), Query.equal("status", ["Pending"]), Query.orderDesc("$createdAt"), Query.limit(100)]
       )
     ]);
 
-    // 4. Attach the student's name to the requests
     const mapWithNames = (docs: Array<{ studentId?: string; [key: string]: unknown }>) => docs.map(doc => ({
       ...doc,
       studentName: doc.studentId ? studentMap[doc.studentId] || "Unknown Student" : "Unknown Student"
@@ -1878,23 +1850,20 @@ export async function getPendingApprovals(mentorId: string) {
 // ==========================================
 // 21. Master Verification Toggle
 // ==========================================
-
 export async function toggleStudentVerification(studentId: string, currentStatus: boolean) {
   try {
     const databases = createAdminDatabases();
     await requireAdminOrCoordinator(databases);
 
-    // Flip the status to the opposite of what it currently is
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId,
       {
         isVerified: !currentStatus
       }
     );
 
-    // Tell Next.js to refresh the mentor pages so the UI updates instantly
     revalidatePath("/mentor-dashboard");
     revalidatePath(`/mentor-dashboard/student/${studentId}`);
     
@@ -1912,18 +1881,16 @@ export async function getSystemAnalytics() {
   try {
     const databases = createAdminDatabases();
     await requireAdminOrCoordinator(databases);
-    const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 
-    // We use Promise.all to fetch all the counts simultaneously for maximum speed!
     const [mentees, verifiedMentees, meetings] = await Promise.all([
       databases.listDocuments(
         DATABASE_ID,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        PROFILES_COLLECTION,
         [Query.equal("role", ["mentee"])]
       ),
       databases.listDocuments(
         DATABASE_ID,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+        PROFILES_COLLECTION,
         [Query.equal("role", ["mentee"]), Query.equal("isVerified", [true])]
       ),
       databases.listDocuments(
@@ -1956,7 +1923,7 @@ export async function createGlobalNotice(formData: FormData) {
     await requireAdminOrCoordinator(databases);
 
     await databases.createDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!, 
       ID.unique(),
       { title, content }
@@ -1979,8 +1946,8 @@ export async function getAllMentors() {
     await requireAdminOrCoordinator(databases);
 
     const mentors = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("role", ["mentor"]), Query.orderDesc("$createdAt")]
     );
 
@@ -2000,12 +1967,11 @@ export async function getVerifiedStudentsForExport() {
     await requireAdminOrCoordinator(databases);
 
     const students = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("role", ["mentee"]), Query.equal("isVerified", [true])]
     );
 
-    // We only return the specific fields we want the University office to see
     const cleanData = students.documents.map((student) => ({
       FullName: student.fullName,
       RollNumber: student.rollNo || "N/A",
@@ -2030,9 +1996,9 @@ export async function getAllProfiles() {
     await requireAdminOrCoordinator(databases);
 
     const profiles = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      [Query.orderDesc("$createdAt")] // Gets everyone!
+      DATABASE_ID,
+      PROFILES_COLLECTION,
+      [Query.orderDesc("$createdAt")] 
     );
 
     return JSON.parse(JSON.stringify(profiles.documents));
@@ -2053,10 +2019,9 @@ export async function deleteUserProfile(profileId: string) {
       throw new Error("You cannot delete your own account.");
     }
 
-    // Completely remove the profile from the database
     await databases.deleteDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       profileId
     );
 
@@ -2078,15 +2043,14 @@ export async function getGlobalSettings() {
     const SETTINGS_COLLECTION = process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!;
 
     const settingsList = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       SETTINGS_COLLECTION,
-      [Query.limit(1)] // We only ever need the single master settings document
+      [Query.limit(1)] 
     );
 
-    // If no settings exist yet, create a default one automatically!
     if (settingsList.total === 0) {
       const defaultSettings = await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         SETTINGS_COLLECTION,
         ID.unique(),
         { activeTerm: "Odd Semesters (July-Dec)", academicYear: "2026-2027" }
@@ -2113,7 +2077,7 @@ export async function updateGlobalSettings(settingsId: string, formData: FormDat
     await requireAdminOrCoordinator(databases);
 
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
       settingsId,
       { activeTerm, academicYear }
@@ -2135,14 +2099,12 @@ export async function getDepartmentAnalytics() {
     const databases = createAdminDatabases();
     await requireAdminOrCoordinator(databases);
 
-    // Fetch all mentees
     const profiles = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("role", ["mentee"])]
     );
 
-    // Group the data by department
     const deptStats: Record<string, { total: number; verified: number }> = {};
 
     profiles.documents.forEach((student) => {
@@ -2158,7 +2120,6 @@ export async function getDepartmentAnalytics() {
       }
     });
 
-    // Format the data specifically for our Chart library
     const chartData = Object.keys(deptStats).map((dept) => ({
       name: dept,
       Total: deptStats[dept].total,
@@ -2180,14 +2141,12 @@ export async function getUnassignedStudents() {
     const databases = createAdminDatabases();
     await requireAdminOrCoordinator(databases);
 
-    // Fetch all mentees
     const mentees = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("role", ["mentee"]), Query.orderDesc("$createdAt")]
     );
 
-    // Filter to only return students who do NOT have a mentorId
     const unassigned = mentees.documents.filter(
       (student) => !student.mentorId || student.mentorId === ""
     );
@@ -2212,26 +2171,17 @@ export async function assignMentorToStudent(studentId: string, formData: FormDat
     await requireAdminOrCoordinator(databases);
 
     const [student, mentor] = await Promise.all([
-      databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        studentId
-      ),
-      databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        mentorId
-      ),
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, studentId),
+      databases.getDocument(DATABASE_ID, PROFILES_COLLECTION, mentorId),
     ]);
 
     if (student.role !== "mentee" || mentor.role !== "mentor") {
       throw new Error("Please select a valid student and mentor.");
     }
 
-    // Update the student's profile with the new mentorId
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId,
       { 
         mentorId: mentorId,
@@ -2256,10 +2206,7 @@ export async function importStudentsFromCSV(formData: FormData) {
     if (!file || file.size === 0) throw new Error("Please select a valid CSV file.");
     if (file.size > 2 * 1024 * 1024) throw new Error("CSV file must be 2MB or smaller.");
 
-    // Read the file content as text
     const text = await file.text();
-    
-    // Split the text into an array of lines, ignoring empty rows
     const lines = text.split("\n").filter(line => line.trim() !== "");
 
     const adminClient = new Client()
@@ -2270,25 +2217,21 @@ export async function importStudentsFromCSV(formData: FormData) {
     const databases = new Databases(adminClient);
     await requireAdminOrCoordinator(databases);
 
-    // Loop through all lines EXCEPT the first one (which contains the headers)
     for (let i = 1; i < lines.length; i++) {
-      // Split each row by commas: [FullName, Email, Department]
       const [fullName, email, department] = lines[i].split(",").map(item => item.trim());
 
-      // Skip invalid rows
       if (!fullName || !email) continue;
 
-      // Create the student document in Appwrite
       await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, // Ensure this matches your collection ID variable
+        DATABASE_ID,
+        PROFILES_COLLECTION, 
         ID.unique(),
         {
           fullName: fullName,
           email: email,
           department: department || "Unassigned",
           role: "mentee",
-          isVerified: true, // Automatically verify students imported by the Admin
+          isVerified: true, 
         }
       );
     }
@@ -2309,21 +2252,18 @@ export async function getSystemActivityLog() {
     const databases = createAdminDatabases();
     await requireAdminOrCoordinator(databases);
 
-    // 1. Fetch latest notices
     const noticesList = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_NOTICES_ID!, // Ensure this matches your notices collection ID
+      DATABASE_ID,
+      process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!, 
       [Query.orderDesc("$createdAt"), Query.limit(3)]
     );
 
-    // 2. Fetch latest student profiles
     const profilesList = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.orderDesc("$createdAt"), Query.limit(4)]
     );
 
-    // 3. Format and merge them into a single timeline array
     const logs: any[] = [];
 
     noticesList.documents.forEach((notice) => {
@@ -2350,10 +2290,8 @@ export async function getSystemActivityLog() {
       });
     });
 
-    // Sort the combined logs from newest to oldest
     logs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    // Return the top 5 most recent activities
     return JSON.parse(JSON.stringify(logs.slice(0, 5)));
   } catch (error) {
     console.error("Failed to fetch activity logs:", error);
@@ -2368,13 +2306,13 @@ export async function getMentorRoster(mentorId: string) {
     const databases = createAdminDatabases();
 
     const mentees = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [
         Query.equal("role", ["mentee"]),
-        Query.equal("mentorId", mentorId), // Only fetch students assigned to THIS mentor
+        Query.equal("mentorId", mentorId), 
         Query.orderDesc("$createdAt"),
-        Query.limit(100) // 🚨 ADDED THIS LINE: Forces Appwrite to send up to 100 students!
+        Query.limit(100) 
       ]
     );
 
@@ -2385,7 +2323,7 @@ export async function getMentorRoster(mentorId: string) {
 
     try {
       const academicRecords = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        DATABASE_ID,
         process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
         [
           Query.equal("studentId", menteeIds),
@@ -2445,12 +2383,11 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
       .setKey(process.env.NEXT_APPWRITE_KEY!);
 
     const databases = new Databases(adminClient);
-    const storage = new Storage(adminClient); // Need the storage service!
+    const storage = new Storage(adminClient); 
     await requireSelfProfile(databases, userId);
 
     let profilePictureId = null;
 
-    // 1. Process and upload the image if it exists
     const file = validateUploadFile(formData.get("profilePicture") as File | null, {
       required: false,
       maxBytes: 2 * 1024 * 1024,
@@ -2469,7 +2406,6 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
       profilePictureId = uploadedFile.$id;
     }
 
-    // 2. Package the text data
     const updateData: any = {
       fullName: formData.get("fullName"),
       rollNo: formData.get("rollNo"),
@@ -2491,15 +2427,13 @@ export async function completeMenteeOnboarding(userId: string, formData: FormDat
       motherEmail: formData.get("motherEmail"),
     };
 
-    // 3. Add the picture ID if we successfully uploaded one
     if (profilePictureId) {
       updateData.profilePictureId = profilePictureId;
     }
 
-    // 4. Save to the database
     await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       userId,
       updateData
     );
@@ -2520,8 +2454,8 @@ export async function getMenteeProfile(userId: string) {
     await requireSelfOrAssignedMentor(databases, userId);
 
     const profile = await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       userId
     );
 
@@ -2541,7 +2475,7 @@ export async function getLatestAcademicRecord(studentId: string) {
     await requireSelfOrAssignedMentor(databases, studentId);
 
     const academicsRes = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       [
         Query.equal("studentId", studentId),
@@ -2568,8 +2502,8 @@ export async function getAcademicRecordsForProfile(studentId: string) {
     const adminDatabases = createAdminDatabases();
 
     const student = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId
     );
 
@@ -2580,7 +2514,7 @@ export async function getAcademicRecordsForProfile(studentId: string) {
     if (!isOwnProfile && !isAssignedMentor) return [];
 
     const academicsRes = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACADEMICS_COLLECTION_ID!,
       [
         Query.equal("studentId", studentId),
@@ -2606,8 +2540,8 @@ export async function getAchievementRecordsForProfile(studentId: string) {
     const adminDatabases = createAdminDatabases();
 
     const student = await adminDatabases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       studentId
     );
 
@@ -2618,7 +2552,7 @@ export async function getAchievementRecordsForProfile(studentId: string) {
     if (!isOwnProfile && !isAssignedMentor) return [];
 
     const achievementsRes = await adminDatabases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      DATABASE_ID,
       process.env.NEXT_PUBLIC_APPWRITE_ACHIEVEMENTS_COLLECTION_ID!,
       [
         Query.equal("studentId", studentId),
@@ -2635,7 +2569,7 @@ export async function getAchievementRecordsForProfile(studentId: string) {
 
 
 // ==========================================
-// 38. Exact-Match Advisory Import (Admin)
+// 38. Exact-Match Advisory Import (Admin) - 🚨 GHOST PROFILE BUG FIXED
 // ==========================================
 export async function importMasterAdvisoryList(formData: FormData) {
   try {
@@ -2644,7 +2578,7 @@ export async function importMasterAdvisoryList(formData: FormData) {
     if (file.size > 2 * 1024 * 1024) throw new Error("CSV file must be 2MB or smaller.");
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/); // Split by row
+    const lines = text.split(/\r?\n/); 
 
     const adminClient = new Client()
       .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
@@ -2655,10 +2589,9 @@ export async function importMasterAdvisoryList(formData: FormData) {
     const users = new Users(adminClient);
     await requireAdminOrCoordinator(databases);
 
-    // 1. Fetch all Mentors currently in the database to match against
     const mentorsResponse = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      DATABASE_ID,
+      PROFILES_COLLECTION,
       [Query.equal("role", ["mentor"])]
     );
     const allMentors = mentorsResponse.documents;
@@ -2666,56 +2599,51 @@ export async function importMasterAdvisoryList(formData: FormData) {
     let successCount = 0;
     let errors: string[] = [];
 
-    // Start at i = 1 to skip the Header row!
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      // Smart split that ignores commas wrapped inside quotes
       const cols = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(val => val.replace(/^"|"$/g, '').trim());
       
       const fullName = cols[1]; 
       const rollNo = cols[2];   
-      const facultyName = cols[5]; // Column F in your clean CSV
-
-      // 🚨 ADD THIS DIAGNOSTIC BLOCK 🚨
-      if (i === 1) {
-        console.log("=== DIAGNOSTIC ROW 1 ===");
-        console.log("Raw text from file:", line);
-        console.log("How the code split it:", cols);
-        console.log(`Name found: '${fullName}', Roll No found: '${rollNo}'`);
-      }
+      const facultyName = cols[5]; 
 
       if (!fullName || !rollNo) continue;
 
-      // === THE INTELLIGENT MATCHING LOGIC ===
-      let currentFacultyId = "unassigned_mentor"; // Default fallback
+      let currentFacultyId = "unassigned_mentor"; 
 
       if (facultyName && facultyName !== "") {
-        // Clean prefixes to ensure solid matching (removes "Dr.", "Prof.", etc.)
         const cleanCsvName = facultyName.toLowerCase().replace(/(dr\.|prof\.)?\s*/g, '').trim();
         
-        // Find the mentor in the database
         const matchedMentor = allMentors.find(m => {
           const cleanDbName = m.fullName.toLowerCase().replace(/(dr\.|prof\.)?\s*/g, '').trim();
           return cleanDbName.includes(cleanCsvName) || cleanCsvName.includes(cleanDbName);
         });
 
-        // If we found them, grab their ID!
         if (matchedMentor) {
           currentFacultyId = matchedMentor.$id;
         } else {
-          // If the teacher isn't in the DB yet, we warn you but still import the student
           errors.push(`Row ${i + 1} (${rollNo}): Mentor '${facultyName}' not found in database. Student marked as Unassigned.`);
         }
       }
 
-      // === THE EMAIL GENERATOR ===
       const cleanRollNo = rollNo.toLowerCase().replace(/\s+/g, '');
       const generatedEmail = `${cleanRollNo}@sot.pdpu.ac.in`;
 
       try {
-        // Step A: Create Auth Account
+        // ✅ NEW: Stop duplicate DB documents from being created!
+        const existingProfile = await databases.listDocuments(
+          DATABASE_ID,
+          PROFILES_COLLECTION,
+          [Query.equal("email", [generatedEmail])]
+        );
+
+        if (existingProfile.total > 0) {
+          errors.push(`Row ${i + 1} (${rollNo}): Student already exists. Skipping.`);
+          continue; // Move on to the next row
+        }
+
         try {
           await users.create(
             ID.unique(),
@@ -2728,10 +2656,9 @@ export async function importMasterAdvisoryList(formData: FormData) {
           if (authError.code !== 409) throw authError; 
         }
 
-        // Step B: Create Database Profile WITH the mapped Faculty ID
         await databases.createDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+          DATABASE_ID,
+          PROFILES_COLLECTION,
           ID.unique(),
           {
             fullName: fullName,
@@ -2740,7 +2667,7 @@ export async function importMasterAdvisoryList(formData: FormData) {
             department: "Unassigned", 
             role: "mentee",
             isVerified: true,
-            mentorId: currentFacultyId // Exactly what the college assigned!
+            mentorId: currentFacultyId 
           }
         );
         
@@ -2754,15 +2681,34 @@ export async function importMasterAdvisoryList(formData: FormData) {
       }
     }
 
-    console.log("=== MAPPED IMPORT RESULTS ===");
-    console.log(`Successfully imported: ${successCount} students.`);
-    console.log(`Errors / Unmatched Mentors:`, errors);
-
     revalidatePath("/admin-dashboard");
     return { success: true, count: successCount, errors };
 
   } catch (error: any) {
     console.error("Master Import Failed:", error);
     return { success: false, error: error.message };
+  }
+}
+
+// ==========================================
+// 39. Check User Role
+// ==========================================
+export async function checkUserRole(email: string) {
+  try {
+    const adminDatabases = createAdminDatabases();
+    
+    const profile = await adminDatabases.listDocuments(
+      DATABASE_ID, 
+      PROFILES_COLLECTION, 
+      [Query.equal("email", [email.toLowerCase()])]
+    );
+    
+    if (profile.total > 0) {
+      return profile.documents[0].role;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch user role:", error);
+    return null;
   }
 }

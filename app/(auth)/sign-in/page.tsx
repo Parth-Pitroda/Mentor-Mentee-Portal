@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signInUser } from "@/lib/actions/auth.actions";
-import toast from "react-hot-toast"; // Ensure you import toast if you want the popups!
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -25,11 +27,11 @@ export default function SignInPage() {
         
         setTimeout(() => {
           if (response.role === "admin" || response.role === "coordinator") {
-            window.location.href = `/admin-dashboard`; // ➔ Route to Admin
+            router.push(`/admin-dashboard`);
           } else if (response.role === "mentor") {
-            window.location.href = `/mentor-dashboard`; // ➔ Route to Mentor
+            router.push(`/mentor-dashboard`);
           } else {
-            window.location.href = `/dashboard/${response.userId}`; // ➔ Route to Mentee
+            router.push(`/dashboard/${response.userId}`);
           }
         }, 300);
 

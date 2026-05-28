@@ -20,11 +20,13 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
-  // Fetch data specific to this mentor
-  const myMentees = await getMentorRoster(user.$id);
-  const notices = await getLatestNotices(5);
-  const scheduledMeetings = await getMentorScheduledMeetings(user.$id);
-  const pendingApprovals = await getPendingApprovals(user.$id);
+  const [myMentees, notices, scheduledMeetings, pendingApprovals] = await Promise.all([
+    getMentorRoster(user.$id),
+    getLatestNotices(5),
+    getMentorScheduledMeetings(user.$id),
+    getPendingApprovals(user.$id)
+  ]);
+  
   const pendingApprovalCount =
     pendingApprovals.meetings.length +
     pendingApprovals.meetingRequests.length +

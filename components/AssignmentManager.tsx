@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { assignMentor } from "@/lib/actions/student.actions";
+import { useRouter } from "next/navigation";
 
 export default function AssignmentManager({ unassignedStudents, availableMentors }: any) {
+  const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -16,7 +18,7 @@ export default function AssignmentManager({ unassignedStudents, availableMentors
     const result = await assignMentor(studentId, mentorId);
 
     if (result.success) {
-      window.location.reload();
+      router.refresh();
     } else {
       setError(result.error);
       setLoadingId(null);
