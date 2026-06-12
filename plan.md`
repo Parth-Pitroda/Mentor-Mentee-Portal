@@ -1,0 +1,70 @@
+# Frontend-to-Backend Migration Plan
+
+This document outlines the strategy for shifting the application from a "Frontend-Direct-to-DB" (Appwrite SDK) approach to a "Backend-Oriented" approach.
+
+## 🎯 Goal
+Remove all direct Appwrite SDK calls from the frontend (Pages and Server Actions) and route all data operations through the Node.js backend API.
+
+---
+
+## 🛠️ Phase 1: Server Action Migration
+We will migrate `frontend/lib/actions/student.actions.ts` and `frontend/lib/actions/auth.actions.ts` in four priority blocks.
+
+### Block 1: Core Identity (High Priority)
+*Goal: Ensure user session and profile management is secure and centralized.*
+- [ ] `completeMenteeOnboarding` $\rightarrow$ `PUT /profiles/me`
+- [ ] `updateProfileDetails` $\rightarrow$ `PATCH /profiles/me`
+- [ ] `getMenteeProfile` $\rightarrow$ `GET /profiles/:id`
+- [ ] `checkUserRole` $\rightarrow$ `GET /auth/role`
+
+### Block 2: Interaction & Meetings (Highest Priority)
+*Goal: Move the most frequent user interactions to the API.*
+- [ ] `logMeeting` $\rightarrow$ `POST /meetings`
+- [ ] `requestMeeting` $\rightarrow$ `POST /meetings/request`
+- [ ] `updateMeetingStatus` $\rightarrow$ `PATCH /meetings/:id/status`
+- [ ] `getMentorScheduledMeetings` $\rightarrow$ `GET /mentor/meetings`
+- [ ] `getMeetingRequests` $\rightarrow$ `GET /mentor/requests`
+- [ ] `updateScheduledMeetingAttendance` $\rightarrow$ `PATCH /meetings/:id/attendance`
+
+### Block 3: Academic Tracking (Complexity Priority)
+*Goal: Migrate file uploads and verification logic.*
+- [ ] `uploadAcademicRecord` $\rightarrow$ `POST /academics` (Handle multipart/form-data)
+- [ ] `uploadAchievement` $\rightarrow$ `POST /achievements`
+- [ ] `updateAcademicStatus` $\rightarrow$ `PATCH /academics/:id/status`
+- [ ] `updateAchievementStatus` $\rightarrow$ `PATCH /achievements/:id/status`
+- [ ] `getAcademicRecordsForProfile` $\rightarrow$ `GET /profiles/:id/academics`
+- [ ] `getAchievementRecordsForProfile` $\rightarrow$ `GET /profiles/:id/achievements`
+
+### Block 4: Admin & Management (System Priority)
+*Goal: Secure administrative operations.*
+- [ ] `assignMentor` / `assignMentorToStudent` $\rightarrow$ `PATCH /admin/assign-mentor`
+- [ ] `importMasterAdvisoryList` / `bulkImportStudents` $\rightarrow$ `POST /admin/import`
+- [ ] `getSystemAnalytics` $\rightarrow$ `GET /admin/analytics`
+- [ ] `deleteUserProfile` $\rightarrow$ `DELETE /admin/profiles/:id`
+- [ ] `getGlobalSettings` / `updateGlobalSettings` $\rightarrow$ `GET/PATCH /admin/settings`
+
+---
+
+## 🎨 Phase 2: Frontend UI Data-Fetching Update
+Even after server actions are migrated, many pages still instantiate the Appwrite SDK internally.
+
+### 1. Component-Level Cleanup
+- [ ] **Dashboard Overview Page** (`app/dashboard/[profileId]/page.tsx`): Remove `new Client()`, `new Databases()` and replace the massive `Promise.all` block with calls to migrated server actions.
+- [ ] **Mentor Dashboard** (`app/mentor-dashboard/page.tsx`): Replace direct SDK fetching with centralized server actions.
+- [ ] **Admin Dashboard**: Replace raw DB queries with API-backed actions.
+
+### 2. API Client Optimization
+- [ ] Implement a standardized Error Handling wrapper in `frontend/lib/api-client.ts` to parse backend errors consistently.
+- [ ] Add TypeScript types for all API responses to ensure type safety between Backend $\rightarrow$ Action $\rightarrow$ UI.
+
+### 3. State & Revalidation
+- [ ] Audit all `revalidatePath` calls to ensure they trigger after backend mutations.
+- [ ] Implement loading states (Skeletons) for the new API-based fetches to prevent UI flicker.
+
+---
+
+## 🧪 Phase 3: Verification & Testing
+- [ ] **Auth Flow:** Test Sign-in $\rightarrow$ Profile $\rightarrow$ Dashboard sequence.
+- [ ] **Meeting Flow:** Request Meeting (Student) $\rightarrow$ Approve (Mentor) $\rightarrow$ View (Both).
+- [ ] **Academic Flow:** Upload PDF $\rightarrow$ Review (Mentor) $\rightarrow$ Verified status update.
+- [ ] **Admin Flow:** CSV Import $\rightarrow$ Mentor Assignment $\rightarrow$ Analytics update.
