@@ -56,11 +56,11 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SPI (Current)</label>
-                <input required name="spi" type="number" step="0.01" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5" />
+                <input required name="spi" type="number" step="0.01" min="0" max="10" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CPI (Cumulative)</label>
-                <input required name="cpi" type="number" step="0.01" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.2" />
+                <input required name="cpi" type="number" step="0.01" min="0" max="10" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.2" />
               </div>
             </div>
 

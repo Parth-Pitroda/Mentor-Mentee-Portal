@@ -216,6 +216,26 @@ export async function updateScheduledMeetingAttendance(meetingId: string, studen
   }
 }
 
+export async function updateMeetingCommonPoints(meetingIds: string[], commonPoints: string) {
+  try {
+    const result = await portalAction("updateMeetingCommonPoints", { meetingIds, commonPoints });
+    revalidatePath("/mentor-dashboard");
+    return result;
+  } catch (error) {
+    return okError(error, "Failed to save common points.");
+  }
+}
+
+export async function updateMeetingStudentNotes(meetingId: string, studentNotes: string) {
+  try {
+    const result = await portalAction("updateMeetingStudentNotes", { meetingId, studentNotes });
+    revalidatePath("/mentor-dashboard");
+    return result;
+  } catch (error) {
+    return okError(error, "Failed to save student notes.");
+  }
+}
+
 export async function uploadAcademicRecord(formData: FormData, studentId: string) {
   try {
     const result = await portalAction("uploadAcademicRecord", { studentId, form: await formDataToObject(formData) });

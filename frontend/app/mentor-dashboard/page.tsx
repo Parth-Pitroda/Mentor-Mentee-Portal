@@ -94,9 +94,18 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
         <nav className="flex-1 p-4 space-y-2">
           <Link 
             href="?tab=roster" 
-            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+            className={`flex items-center justify-between gap-3 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
           >
-            My Mentees
+            <span>My Mentees</span>
+            {myMentees && myMentees.length > 0 && (
+              <span className={`flex min-h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none border transition-all ${
+                activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting'
+                  ? 'bg-blue-600 text-white border-blue-700'
+                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>
+                {myMentees.length}
+              </span>
+            )}
           </Link>
           <Link 
             href="?tab=meetings" 

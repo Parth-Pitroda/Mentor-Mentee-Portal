@@ -153,7 +153,7 @@ export default function StudentOnboarding() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Current GPA / CGPA</label>
-            <input type="number" step="0.01" {...register("currentGpa")} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. 8.5" />
+            <input type="number" step="0.01" min="0" max="10" {...register("currentGpa")} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. 8.5" />
             {errors.currentGpa && <p className="text-red-500 text-xs mt-1">{errors.currentGpa.message}</p>}
           </div>
         </div>

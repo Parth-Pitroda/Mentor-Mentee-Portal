@@ -56,6 +56,18 @@ export default async function DashboardLayout({
     redirect(`/dashboard/${currentProfile.$id}`);
   }
 
+  // Redirect to onboarding if this is the student's own workspace and they haven't completed onboarding yet
+  if (currentProfile.role === "mentee" || !currentProfile.role) {
+    const isProfileComplete =
+      (currentProfile as any).department &&
+      (currentProfile as any).department !== "Pending Assignment" &&
+      (currentProfile as any).department !== "Unassigned";
+
+    if (!isProfileComplete) {
+      redirect("/onboarding");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <PortalTopNavbar userName={user.name || "User"} userEmail={user.email} />

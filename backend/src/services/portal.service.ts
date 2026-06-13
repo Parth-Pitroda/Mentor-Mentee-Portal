@@ -382,8 +382,70 @@ export class PortalService {
     return { success: true };
   }
 
+  static async updateMeetingCommonPoints({ meetingIds, commonPoints }: { meetingIds: string[]; commonPoints: string }, ctx: PortalContext) {
+    requireRole(ctx, ["mentor"]);
+    if (!Array.isArray(meetingIds) || meetingIds.length === 0) throw new Error("No meeting IDs provided.");
+    const text = String(commonPoints ?? "").trim();
+    const db = adminDatabases();
+
+    for (const id of meetingIds) {
+      const meeting = await db.getDocument(databaseId(), meetingsId(), id);
+      if (!String(meeting.description || "").includes(MEETING_MARKER)) throw new Error("One or more meetings are not roster scheduled meetings.");
+      // Try saving as a dedicated commonPoints attribute first
+      try {
+        await db.updateDocument(databaseId(), meetingsId(), id, { commonPoints: text });
+      } catch {
+        // Attribute may not exist yet – embed into description as a fallback
+        const desc = String(meeting.description || "");
+        const marker = "\n---COMMON_POINTS---\n";
+        const base = desc.includes(marker) ? desc.slice(0, desc.indexOf(marker)) : desc;
+        await db.updateDocument(databaseId(), meetingsId(), id, { description: base + marker + text });
+      }
+    }
+    return { success: true };
+  }
+
+  static async updateMeetingStudentNotes({ meetingId, studentNotes }: { meetingId: string; studentNotes: string }, ctx: PortalContext) {
+    requireRole(ctx, ["mentor"]);
+    if (!meetingId) throw new Error("Meeting ID is required.");
+    const db = adminDatabases();
+    const meeting = await db.getDocument(databaseId(), meetingsId(), meetingId);
+    if (!String(meeting.description || "").includes(MEETING_MARKER)) throw new Error("This is not a roster scheduled meeting.");
+    const text = String(studentNotes ?? "").trim();
+    // Try saving as a dedicated studentNotes attribute first
+    try {
+      await db.updateDocument(databaseId(), meetingsId(), meetingId, { studentNotes: text });
+    } catch {
+      // Attribute may not exist – embed into description as fallback
+      const desc = String(meeting.description || "");
+      const marker = "\n---STUDENT_NOTES---\n";
+      const cpMarker = "\n---COMMON_POINTS---\n";
+      // Preserve everything before STUDENT_NOTES marker (but also before COMMON_POINTS if it comes after)
+      let base = desc;
+      if (base.includes(marker)) base = base.slice(0, base.indexOf(marker));
+      // If common points marker exists, preserve it and content after it
+      let cpSuffix = "";
+      if (desc.includes(cpMarker)) {
+        const cpIndex = desc.indexOf(cpMarker);
+        if (base.includes(cpMarker)) {
+          base = base.slice(0, cpIndex);
+        }
+        cpSuffix = desc.slice(cpIndex);
+        // Remove student notes from cpSuffix if embedded there
+        if (cpSuffix.includes(marker)) cpSuffix = cpSuffix.slice(0, cpSuffix.indexOf(marker));
+      }
+      await db.updateDocument(databaseId(), meetingsId(), meetingId, { description: base + marker + text + cpSuffix });
+    }
+    return { success: true };
+  }
+
   static async uploadAcademicRecord({ studentId, form }: { studentId: string; form: any }, ctx: PortalContext) {
     if (ctx.profile.$id !== studentId) throw new Error("You can only update your own profile.");
+    const spi = Number(form.spi);
+    const cpi = Number(form.cpi);
+    if (isNaN(spi) || spi < 0 || spi > 10) throw new Error("SPI must be between 0 and 10.");
+    if (isNaN(cpi) || cpi < 0 || cpi > 10) throw new Error("CPI must be between 0 and 10.");
+
     const fileId = await uploadFile(form.file, { required: true, maxBytes: 5 * 1024 * 1024, allowedTypes: ["application/pdf", "image/jpeg", "image/png"] });
     const record = await adminDatabases().createDocument(databaseId(), academicsId(), ID.unique(), {
       studentId,
@@ -634,6 +696,10 @@ export class PortalService {
 
   static async completeMenteeOnboarding({ userId, form }: { userId: string; form: any }, ctx: PortalContext) {
     if (ctx.profile.$id !== userId) throw new Error("You can only update your own profile.");
+    if (form.cgpa) {
+      const cgpa = Number(form.cgpa);
+      if (isNaN(cgpa) || cgpa < 0 || cgpa > 10) throw new Error("CGPA must be between 0 and 10.");
+    }
     const profilePictureId = await uploadFile(form.profilePicture, { required: false, maxBytes: 2 * 1024 * 1024, allowedTypes: ["image/jpeg", "image/png"] });
     const updateData = { ...form };
     delete updateData.profilePicture;

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateScheduledMeetingAttendance } from "@/lib/actions/student.actions";
+import { updateScheduledMeetingAttendance, updateMeetingCommonPoints, updateMeetingStudentNotes } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
+
+type StudentNote = { problem: string; action: string };
 
 type ScheduledMeeting = {
   $id: string;
@@ -19,6 +21,8 @@ type ScheduledMeeting = {
   meetingMode?: string;
   meetingLink?: string;
   agenda?: string;
+  commonPoints?: string;
+  studentNotes?: string;
   student?: {
     $id: string;
     fullName?: string;
@@ -39,6 +43,7 @@ type MeetingGroup = {
   link: string;
   venue: string;
   agenda: string;
+  commonPoints: string;
   records: ScheduledMeeting[];
 };
 
@@ -87,6 +92,46 @@ function safeFileName(value: string) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase() || "meeting-report";
+}
+
+function parseStudentNotes(meeting: ScheduledMeeting): StudentNote[] {
+  // Try dedicated attribute first
+  const raw = (meeting as any).studentNotes || "";
+  if (raw) {
+    try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed; } catch { /* fall through */ }
+  }
+  // Try description fallback
+  const desc = meeting.description || "";
+  const marker = "\n---STUDENT_NOTES---\n";
+  if (desc.includes(marker)) {
+    let slice = desc.slice(desc.indexOf(marker) + marker.length);
+    // Trim off any following markers
+    const cpMarker = "\n---COMMON_POINTS---\n";
+    if (slice.includes(cpMarker)) slice = slice.slice(0, slice.indexOf(cpMarker));
+    try { const parsed = JSON.parse(slice.trim()); if (Array.isArray(parsed)) return parsed; } catch { /* ignore */ }
+  }
+  return [];
+}
+
+function problemRows(records: ScheduledMeeting[]) {
+  const rows: { studentId: string; studentName: string; rollNo: string; problem: string; action: string }[] = [];
+  for (const meeting of records) {
+    const student = meeting.student;
+    const name = student?.fullName || meeting.studentName || "Unknown Student";
+    const roll = student?.rollNo || meeting.studentId;
+    const notes = parseStudentNotes(meeting);
+    for (const note of notes) {
+      if (note.problem || note.action) {
+        rows.push({ studentId: meeting.studentId, studentName: name, rollNo: roll, problem: note.problem, action: note.action });
+      }
+    }
+  }
+  if (rows.length === 0) {
+    return `<tr><td>1</td><td>&nbsp;</td><td>&nbsp;</td><td>No specific problem recorded.</td><td>&nbsp;</td></tr>`;
+  }
+  return rows.map((row, i) =>
+    `<tr><td>${i + 1}</td><td>${escapeHtml(row.rollNo)}</td><td>${escapeHtml(row.studentName)}</td><td>${escapeHtml(row.problem)}</td><td>${escapeHtml(row.action)}</td></tr>`
+  ).join("");
 }
 
 function rosterRows(records: ScheduledMeeting[]) {
@@ -147,7 +192,7 @@ function buildMeetingReportHtml(group: MeetingGroup, logoDataUrl: string) {
   const mentorName = group.records.find((record) => record.mentorName)?.mentorName || "Faculty Mentor";
   const presentCount = group.records.filter((record) => record.status === "Verified").length;
   const absentCount = group.records.length - presentCount;
-  const commonPoints = [group.topic, group.agenda].filter(Boolean).join("\n\n");
+  const commonPoints = group.commonPoints || [group.topic, group.agenda].filter(Boolean).join("\n\n");
   const logoHtml = logoDataUrl
     ? `<img class="logo" src="${logoDataUrl}" alt="Pandit Deendayal Energy University logo" />`
     : "";
@@ -235,21 +280,15 @@ function buildMeetingReportHtml(group: MeetingGroup, logoDataUrl: string) {
   <table>
     <thead>
       <tr>
-        <th>Sr. No</th>
+        <th>Sr No</th>
         <th>ID No</th>
-        <th>Name of Student</th>
+        <th>Student Name</th>
         <th>Problem Faced</th>
-        <th>Action Taken/Suggestion</th>
+        <th>Solution</th>
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td>1</td>
-        <td>&nbsp;</td>
-        <td>&nbsp;</td>
-        <td>No specific problem recorded.</td>
-        <td>&nbsp;</td>
-      </tr>
+      ${problemRows(group.records)}
     </tbody>
   </table>
 </body>
@@ -274,6 +313,15 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
   const router = useRouter();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [commonPointsText, setCommonPointsText] = useState<string>("");
+  const [savingCommonPoints, setSavingCommonPoints] = useState(false);
+  const [commonPointsMessage, setCommonPointsMessage] = useState("");
+
+  // Per-student notes state
+  const [notesMap, setNotesMap] = useState<Record<string, StudentNote[]>>({});
+  const [openNotesId, setOpenNotesId] = useState<string | null>(null);
+  const [savingNotesId, setSavingNotesId] = useState<string | null>(null);
+  const [notesMessage, setNotesMessage] = useState<Record<string, string>>({});
 
   const groups = useMemo<MeetingGroup[]>(() => {
     const groupMap = new Map<string, MeetingGroup>();
@@ -291,6 +339,16 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
       ].join("||");
 
       if (!groupMap.has(key)) {
+        // Extract saved commonPoints from the meeting record
+        const descMarker = "\n---COMMON_POINTS---\n";
+        const desc = meeting.description || "";
+        let savedFromDesc = desc.includes(descMarker) ? desc.slice(desc.indexOf(descMarker) + descMarker.length).trim() : "";
+        const snMarker = "\n---STUDENT_NOTES---\n";
+        if (savedFromDesc.includes(snMarker)) {
+          savedFromDesc = savedFromDesc.slice(0, savedFromDesc.indexOf(snMarker)).trim();
+        }
+        const savedCommonPoints = (meeting as any).commonPoints || savedFromDesc || "";
+
         groupMap.set(key, {
           key,
           topic: meeting.topic || "Scheduled Meeting",
@@ -300,6 +358,7 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
           link: details.link,
           venue: details.venue,
           agenda: details.agenda,
+          commonPoints: savedCommonPoints,
           records: [],
         });
       }
@@ -312,11 +371,79 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
 
   const selectedGroup = groups.find((group) => group.key === selectedKey) || groups[0] || null;
 
+  // Sync commonPointsText when selected group changes
+  const selectedGroupKey = selectedGroup?.key ?? null;
+  const prevKeyRef = useMemo(() => ({ current: "" }), []);
+  if (selectedGroupKey !== prevKeyRef.current) {
+    prevKeyRef.current = selectedGroupKey ?? "";
+    if (selectedGroup && commonPointsText !== selectedGroup.commonPoints) {
+      setCommonPointsText(selectedGroup.commonPoints);
+      setCommonPointsMessage("");
+    }
+  }
+
+  async function handleSaveCommonPoints() {
+    if (!selectedGroup) return;
+    setSavingCommonPoints(true);
+    setCommonPointsMessage("");
+    const ids = selectedGroup.records.map((r) => r.$id);
+    const result = await updateMeetingCommonPoints(ids, commonPointsText);
+    setSavingCommonPoints(false);
+    if (result && (result as any).success) {
+      setCommonPointsMessage("Saved!");
+      router.refresh();
+    } else {
+      setCommonPointsMessage((result as any)?.error || "Failed to save.");
+    }
+  }
+
   async function handleAttendance(meeting: ScheduledMeeting, attended: boolean) {
     setUpdatingId(meeting.$id);
     await updateScheduledMeetingAttendance(meeting.$id, meeting.studentId, attended);
     setUpdatingId(null);
     router.refresh();
+  }
+
+  // --- Student notes helpers ---
+  function getNotesForMeeting(meetingId: string, meeting: ScheduledMeeting): StudentNote[] {
+    if (notesMap[meetingId] !== undefined) return notesMap[meetingId];
+    return parseStudentNotes(meeting);
+  }
+
+  function setNotes(meetingId: string, notes: StudentNote[]) {
+    setNotesMap((prev) => ({ ...prev, [meetingId]: notes }));
+  }
+
+  function handleAddNote(meetingId: string, meeting: ScheduledMeeting) {
+    const current = getNotesForMeeting(meetingId, meeting);
+    setNotes(meetingId, [...current, { problem: "", action: "" }]);
+  }
+
+  function handleUpdateNote(meetingId: string, index: number, field: "problem" | "action", value: string, meeting: ScheduledMeeting) {
+    const current = [...getNotesForMeeting(meetingId, meeting)];
+    current[index] = { ...current[index], [field]: value };
+    setNotes(meetingId, current);
+  }
+
+  function handleRemoveNote(meetingId: string, index: number, meeting: ScheduledMeeting) {
+    const current = [...getNotesForMeeting(meetingId, meeting)];
+    current.splice(index, 1);
+    setNotes(meetingId, current);
+  }
+
+  async function handleSaveNotes(meetingId: string, meeting: ScheduledMeeting) {
+    const notes = getNotesForMeeting(meetingId, meeting).filter((n) => n.problem || n.action);
+    setSavingNotesId(meetingId);
+    setNotesMessage((prev) => ({ ...prev, [meetingId]: "" }));
+    const result = await updateMeetingStudentNotes(meetingId, JSON.stringify(notes));
+    setSavingNotesId(null);
+    if (result && (result as any).success) {
+      setNotesMessage((prev) => ({ ...prev, [meetingId]: "Saved!" }));
+      setNotes(meetingId, notes);
+      router.refresh();
+    } else {
+      setNotesMessage((prev) => ({ ...prev, [meetingId]: (result as any)?.error || "Failed to save." }));
+    }
   }
 
   if (groups.length === 0) {
@@ -396,6 +523,35 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
             <p className="mt-4 whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
               {selectedGroup.agenda || "No agenda provided."}
             </p>
+
+            {/* Common Points Section */}
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                Common Points Related to All Students
+              </label>
+              <textarea
+                value={commonPointsText}
+                onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
+                rows={4}
+                placeholder="Enter common discussion points, observations, or notes that apply to all students in this meeting..."
+                className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleSaveCommonPoints()}
+                  disabled={savingCommonPoints}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {savingCommonPoints ? "Saving..." : "Save Common Points"}
+                </button>
+                {commonPointsMessage && (
+                  <span className={`text-sm font-semibold ${commonPointsMessage === "Saved!" ? "text-green-600" : "text-red-600"}`}>
+                    {commonPointsMessage}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="divide-y divide-slate-100">
@@ -404,47 +560,134 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
               const studentName = student?.fullName || meeting.studentName || "Unknown Student";
               const attended = meeting.status === "Verified";
 
+              const currentNotes = getNotesForMeeting(meeting.$id, meeting);
+              const isNotesOpen = openNotesId === meeting.$id;
+              const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
+
               return (
-                <div key={meeting.$id} className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center">
-                  <Link
-                    href={`?tab=student-profile&id=${meeting.studentId}`}
-                    className="flex min-w-0 items-center gap-4 rounded-lg p-1 transition hover:bg-slate-50"
-                  >
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-blue-100 bg-blue-50 text-sm font-bold text-blue-700">
-                      {student?.profilePictureId ? (
-                        <img
-                          src={getFileViewUrl(student.profilePictureId)}
-                          alt={`${studentName} Profile`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        getInitials(studentName)
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-900">{studentName}</p>
-                      <p className="truncate text-sm text-slate-500">{student?.email || "No email available"}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {student?.department && (
-                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.department}</span>
+                <div key={meeting.$id} className="p-5">
+                  <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                    <Link
+                      href={`?tab=student-profile&id=${meeting.studentId}`}
+                      className="flex min-w-0 items-center gap-4 rounded-lg p-1 transition hover:bg-slate-50"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-blue-100 bg-blue-50 text-sm font-bold text-blue-700">
+                        {student?.profilePictureId ? (
+                          <img
+                            src={getFileViewUrl(student.profilePictureId)}
+                            alt={`${studentName} Profile`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          getInitials(studentName)
                         )}
-                        {student?.rollNo && (
-                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.rollNo}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-900">{studentName}</p>
+                        <p className="truncate text-sm text-slate-500">{student?.email || "No email available"}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {student?.department && (
+                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.department}</span>
+                          )}
+                          {student?.rollNo && (
+                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.rollNo}</span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={attended}
+                          disabled={updatingId === meeting.$id}
+                          onChange={(event) => handleAttendance(meeting, event.target.checked)}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                        {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenNotesId(isNotesOpen ? null : meeting.$id)}
+                        className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition ${
+                          isNotesOpen
+                            ? "border-amber-300 bg-amber-50 text-amber-700"
+                            : noteCount > 0
+                              ? "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-200"
+                        }`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                          <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                          <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                        </svg>
+                        Action{noteCount > 0 ? ` (${noteCount})` : ""}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Student Notes Inline Editor */}
+                  {isNotesOpen && (
+                    <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50/40 p-4">
+                      <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Problems Faced & Solutions</p>
+                      {currentNotes.length === 0 && (
+                        <p className="mb-3 text-sm text-slate-500">No problems recorded. Click "Add Problem" to start.</p>
+                      )}
+                      <div className="space-y-3">
+                        {currentNotes.map((note, noteIndex) => (
+                          <div key={noteIndex} className="rounded-lg border border-slate-200 bg-white p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-500">Problem #{noteIndex + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveNote(meeting.$id, noteIndex, meeting)}
+                                className="text-xs font-bold text-red-500 hover:text-red-700"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <textarea
+                              value={note.problem}
+                              onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "problem", e.target.value, meeting)}
+                              rows={2}
+                              placeholder="Problem Faced: Describe the problem faced by the student..."
+                              className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                            <textarea
+                              value={note.action}
+                              onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "action", e.target.value, meeting)}
+                              rows={2}
+                              placeholder="Solution / Action Taken: Describe the action taken or solution..."
+                              className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleAddNote(meeting.$id, meeting)}
+                          className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+                        >
+                          + Add Problem
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveNotes(meeting.$id, meeting)}
+                          disabled={savingNotesId === meeting.$id}
+                          className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-60"
+                        >
+                          {savingNotesId === meeting.$id ? "Saving..." : "Save Notes"}
+                        </button>
+                        {notesMessage[meeting.$id] && (
+                          <span className={`text-sm font-semibold ${notesMessage[meeting.$id] === "Saved!" ? "text-green-600" : "text-red-600"}`}>
+                            {notesMessage[meeting.$id]}
+                          </span>
                         )}
                       </div>
                     </div>
-                  </Link>
-
-                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={attended}
-                      disabled={updatingId === meeting.$id}
-                      onChange={(event) => handleAttendance(meeting, event.target.checked)}
-                      className="h-4 w-4 accent-blue-600"
-                    />
-                    {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
-                  </label>
+                  )}
                 </div>
               );
             })}

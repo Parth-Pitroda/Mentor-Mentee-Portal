@@ -24,7 +24,15 @@ export default function OnboardingWizard({ userId, userName, userEmail }: { user
   const handlePrev = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let { name, value } = e.target;
+    // Enforce exactly 10 digits for phone fields
+    if (name === "phone" || name === "fatherPhone" || name === "motherPhone") {
+      value = value.replace(/\D/g, ""); // Keep only digits
+      if (value.length > 10) {
+        value = value.slice(0, 10);
+      }
+    }
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +113,18 @@ export default function OnboardingWizard({ userId, userName, userEmail }: { user
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Phone Number</label>
-                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  required
+                  pattern="[0-9]{10}"
+                  maxLength={10}
+                  title="Please enter a valid 10-digit phone number"
+                  placeholder="e.g. 9876543210"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -163,7 +182,7 @@ export default function OnboardingWizard({ userId, userName, userEmail }: { user
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Current CGPA</label>
-                  <input type="number" step="0.01" name="cgpa" value={formData.cgpa} onChange={handleChange} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5"/>
+                  <input type="number" step="0.01" min="0" max="10" name="cgpa" value={formData.cgpa} onChange={handleChange} className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 8.5"/>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Active Backlogs</label>
@@ -196,7 +215,18 @@ export default function OnboardingWizard({ userId, userName, userEmail }: { user
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
-                  <input type="tel" name="fatherPhone" value={formData.fatherPhone} onChange={handleChange} required className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="tel"
+                    name="fatherPhone"
+                    value={formData.fatherPhone}
+                    onChange={handleChange}
+                    required
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    title="Please enter a valid 10-digit phone number"
+                    placeholder="10-digit number"
+                    className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
@@ -216,7 +246,18 @@ export default function OnboardingWizard({ userId, userName, userEmail }: { user
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
-                  <input type="tel" name="motherPhone" value={formData.motherPhone} onChange={handleChange} required className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="tel"
+                    name="motherPhone"
+                    value={formData.motherPhone}
+                    onChange={handleChange}
+                    required
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    title="Please enter a valid 10-digit phone number"
+                    placeholder="10-digit number"
+                    className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
