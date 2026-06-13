@@ -295,18 +295,73 @@ function buildMeetingReportHtml(group: MeetingGroup, logoDataUrl: string) {
 </html>`;
 }
 
-async function exportMeetingReport(group: MeetingGroup) {
+async function exportMeetingReportDocx(group: MeetingGroup) {
   const logoDataUrl = await getReportLogoDataUrl();
   const html = buildMeetingReportHtml(group, logoDataUrl);
-  const blob = new Blob(["\ufeff", html], { type: "application/msword;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${safeFileName(`${group.topic}-${group.date}`)}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  const filename = safeFileName(`${group.topic}-${group.date}`);
+
+  try {
+    const response = await fetch("/api/export-docx", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ html, filename }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to export Word document");
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Failed to export DOCX:", error);
+    alert("Could not export Word document. Please try again.");
+  }
+}
+
+async function exportMeetingReportPdf(group: MeetingGroup) {
+  const logoDataUrl = await getReportLogoDataUrl();
+  const html = buildMeetingReportHtml(group, logoDataUrl);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const style = doc.createElement("style");
+    style.innerHTML = `
+      @media print {
+        body { margin: 1.6cm 1.2cm; }
+        .no-print { display: none !important; }
+      }
+    `;
+    doc.head.appendChild(style);
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      document.body.removeChild(iframe);
+    }, 500);
+  }
 }
 
 export default function MentorScheduledMeetings({ meetings }: { meetings: ScheduledMeeting[] }) {
@@ -503,10 +558,13 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => void exportMeetingReport(selectedGroup)}
-                  className="w-fit rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+                  onClick={() => void exportMeetingReportPdf(selectedGroup)}
+                  className="flex items-center gap-1.5 w-fit rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
                 >
-                  Export Report
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 19.164l-.22-1.033A8.001 8.001 0 0113.5 10.5h.75V8.25A2.25 2.25 0 0012 6H4.5A2.25 2.25 0 002.25 8.25v10.5A2.25 2.25 0 004.5 21h2.22m12.78-1.836l.22 1.033A8.001 8.001 0 0110.5 13.5h-.75V15.75a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0021.75 15.75v-10.5A2.25 2.25 0 0019.5 3h-2.22" />
+                  </svg>
+                  Export PDF
                 </button>
                 {selectedGroup.link && (
                   <a
