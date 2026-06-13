@@ -5,6 +5,8 @@ import Link from "next/link";
 import MenteeCard, { type MenteeCardStudent } from "@/components/MenteeCard";
 
 type ViewMode = "all" | "top";
+type SearchField = "all" | "name" | "rollNo" | "email" | "department" | "semester";
+
 
 function normalize(value: unknown) {
   return String(value || "").toLowerCase().trim();
@@ -26,6 +28,7 @@ function getScore(mentee: MenteeCardStudent) {
 
 export default function MentorRosterExplorer({ mentees }: { mentees: MenteeCardStudent[] }) {
   const [query, setQuery] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("all");
 
   const rankedMentees = useMemo(() => {
@@ -46,25 +49,59 @@ export default function MentorRosterExplorer({ mentees }: { mentees: MenteeCardS
     const search = normalize(query);
 
     if (!search) return source;
-    return source.filter((mentee) => getSearchText(mentee).includes(search));
-  }, [mentees, query, topPerformers, viewMode]);
+
+    return source.filter((mentee) => {
+      if (searchField === "all") {
+        return getSearchText(mentee).includes(search);
+      }
+
+      const fieldMap: Record<string, string | undefined> = {
+        name: mentee.fullName,
+        rollNo: mentee.rollNo,
+        email: mentee.email,
+        department: mentee.department,
+        semester: mentee.semester,
+      };
+
+      return normalize(fieldMap[searchField]).includes(search);
+    });
+  }, [mentees, query, searchField, topPerformers, viewMode]);
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
+          <div className="flex flex-col gap-1.5">
             <label htmlFor="mentee-search" className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Search Mentees
             </label>
-            <input
-              id="mentee-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name, roll number, email, department, or semester"
-              className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
+            <div className="flex gap-2">
+              <select
+                id="mentee-search-field"
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value as SearchField)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="all">All Fields</option>
+                <option value="name">Name</option>
+                <option value="rollNo">Roll Number</option>
+                <option value="email">Email</option>
+                <option value="department">Department</option>
+                <option value="semester">Semester</option>
+              </select>
+              <input
+                id="mentee-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={
+                  searchField === "all"
+                    ? "Search by name, roll number, email, etc."
+                    : `Search by ${searchField}...`
+                }
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
 
           <div className="flex w-full rounded-lg border border-slate-200 bg-slate-100 p-1 lg:w-fit">
