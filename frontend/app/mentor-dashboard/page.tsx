@@ -1,11 +1,19 @@
 export const dynamic = "force-dynamic";
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
-import { getLatestNotices, getMentorRoster, getMenteeProfile, getLatestAcademicRecord, getMentorScheduledMeetings, getAcademicRecordsForProfile, getAchievementRecordsForProfile, getPendingApprovals } from "@/lib/actions/student.actions";
+import { 
+  getLatestNotices, 
+  getMentorRoster, 
+  getMenteeProfile, 
+  getLatestAcademicRecord, 
+  getMentorScheduledMeetings, 
+  getAcademicRecordsForProfile, 
+  getAchievementRecordsForProfile, 
+  getPendingApprovals 
+} from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
-import PortalTopNavbar from "@/components/PortalTopNavbar";
 import MentorMeetingScheduler from "@/components/MentorMeetingScheduler";
 import MentorScheduledMeetings from "@/components/MentorScheduledMeetings";
 import AcademicsManager from "@/components/AcademicsManager";
@@ -13,6 +21,19 @@ import AchievementsManager from "@/components/AchievementsManager";
 import MentorRosterExplorer from "@/components/MentorRosterExplorer";
 import { getFileViewUrl } from "@/lib/files";
 import type { NoticeRecord } from "@/types";
+import { 
+  Users, 
+  CalendarDays, 
+  CheckSquare, 
+  Bell, 
+  ChevronLeft, 
+  GraduationCap, 
+  UserCircle, 
+  Activity,
+  MapPin,
+  Phone,
+  FileText
+} from "lucide-react";
 
 export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string }> }) {
   const searchParams = await props.searchParams;
@@ -81,65 +102,87 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     pageDesc = `Achievement records submitted by ${selectedStudent.fullName}.`;
   }
 
+  const isRosterActive = activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements';
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <PortalTopNavbar userName={user.name || "Faculty Mentor"} userEmail={user.email} />
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-200 selection:text-slate-900">
       
-      {/* ================= SIDEBAR ================= */}
-      <aside className="fixed top-16 z-20 hidden h-[calc(100vh-4rem)] w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1 block">Faculty Dashboard</span>
+      {/* ================= FULL-HEIGHT SIDEBAR ================= */}
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
+        
+        {/* BRANDING LOGO */}
+        <div className="flex h-24 shrink-0 items-center gap-4 border-b border-slate-100 px-6">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xl font-black text-white shadow-md">
+            P
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="text-lg font-bold tracking-tight text-slate-900 leading-tight">PDEU Portal</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">Faculty Workspace</p>
+          </div>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
+
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 pt-6">
           <Link 
             href="?tab=roster" 
-            className={`flex items-center justify-between gap-3 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+            className={`group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${isRosterActive ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
           >
-            <span>My Mentees</span>
+            <div className="flex items-center">
+              <Users className={`w-5 h-5 mr-3 transition-colors ${isRosterActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
+              <span>My Mentees</span>
+            </div>
             {myMentees && myMentees.length > 0 && (
-              <span className={`flex min-h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none border transition-all ${
-                activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting'
-                  ? 'bg-blue-600 text-white border-blue-700'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold shadow-sm ${
+                isRosterActive
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-200 text-slate-700'
               }`}>
                 {myMentees.length}
               </span>
             )}
           </Link>
+
           <Link 
             href="?tab=meetings" 
-            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'meetings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+            className={`group flex items-center px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === 'meetings' ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
           >
+            <CalendarDays className={`w-5 h-5 mr-3 transition-colors ${activeTab === 'meetings' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
             Meetings
           </Link>
+
           <Link 
             href="/mentor-dashboard/approvals" 
-            className={`flex items-center justify-between gap-3 px-4 py-2 rounded-lg font-medium transition-all text-slate-600 hover:bg-slate-50 hover:text-blue-700`}
+            className="group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
           >
-            <span>Pending Approvals</span>
+            <div className="flex items-center">
+              <CheckSquare className="w-5 h-5 mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+              <span>Pending Approvals</span>
+            </div>
             {pendingApprovalCount > 0 && (
-              <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-black leading-none text-white">
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white shadow-sm">
                 {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
               </span>
             )}
           </Link>
+
           <Link 
             href="?tab=notices" 
-            className={`block px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'notices' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'}`}
+            className={`group flex items-center px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === 'notices' ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
           >
+            <Bell className={`w-5 h-5 mr-3 transition-colors ${activeTab === 'notices' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
             Global Notices
           </Link>
         </nav>
         
+        {/* USER PROFILE & LOGOUT */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
            <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="w-9 h-9 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center font-bold text-sm shadow-sm border border-purple-200">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white shadow-sm">
                 {user.name ? user.name.charAt(0).toUpperCase() : "M"}
               </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-bold text-slate-800 truncate">{user.name || "Faculty Member"}</span>
-                <span className="text-xs text-slate-500 font-medium tracking-wide">Mentor</span>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold text-slate-900">{user.name || "Faculty Member"}</span>
+                <span className="truncate text-xs text-slate-500 font-medium">Mentor Account</span>
               </div>
            </div>
            <div className="px-1"><LogoutButton /></div>
@@ -147,51 +190,52 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
       </aside>
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <main className="min-h-screen p-8 pt-24 md:ml-64">
+      <main className="min-h-screen p-6 lg:p-10 md:ml-[17rem]">
         <div className="max-w-6xl mx-auto">
           
           {/* DYNAMIC HEADER & NOTIFICATIONS */}
-          <div className="mb-8 flex items-start justify-between border-b border-slate-200 pb-6">
+          <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
             <div>
-              {/* Show 'Back to Roster' ONLY on the profile page */}
+              {/* Contextual Back Buttons */}
               {activeTab === 'student-profile' && (
-                <Link href="?tab=roster" className="text-sm font-bold text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-1 transition-colors">
-                  Back to Roster
+                <Link href="?tab=roster" className="text-sm font-semibold text-slate-500 hover:text-slate-900 mb-3 flex items-center gap-1 transition-colors">
+                  <ChevronLeft className="w-4 h-4" /> Back to Roster
                 </Link>
               )}
-              {/* Show 'Back to Dossier' ONLY on the log meeting page */}
               {activeTab === 'log-meeting' && selectedStudent && (
-                <Link href={`?tab=student-profile&id=${selectedStudent.$id}`} className="text-sm font-bold text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-1 transition-colors">
-                  Back to Dossier
+                <Link href={`?tab=student-profile&id=${selectedStudent.$id}`} className="text-sm font-semibold text-slate-500 hover:text-slate-900 mb-3 flex items-center gap-1 transition-colors">
+                  <ChevronLeft className="w-4 h-4" /> Back to Dossier
                 </Link>
               )}
               {(activeTab === 'student-academics' || activeTab === 'student-achievements') && selectedStudent && (
-                <Link href={`?tab=student-profile&id=${selectedStudent.$id}`} className="text-sm font-bold text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-1 transition-colors">
-                  Back to Dossier
+                <Link href={`?tab=student-profile&id=${selectedStudent.$id}`} className="text-sm font-semibold text-slate-500 hover:text-slate-900 mb-3 flex items-center gap-1 transition-colors">
+                  <ChevronLeft className="w-4 h-4" /> Back to Dossier
                 </Link>
               )}
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Faculty Workspace</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+              
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
                 {pageTitle}
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1.5 text-sm font-medium text-slate-500">
                 {pageDesc}
               </p>
             </div>
             
-            <div className="mt-1">
+            <div className="mb-2 lg:mb-0">
               <NotificationBell />
             </div>
           </div>
 
           {/* ================= TAB 1: MENTEE ROSTER ================= */}
           {activeTab === 'roster' && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
               {(!myMentees || myMentees.length === 0) ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <div className="mx-auto mb-4 h-12 w-12 rounded-lg bg-slate-100" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">No students assigned</h3>
-                  <p className="text-slate-500 font-medium">The administration has not assigned any mentees to your roster yet.</p>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50">
+                    <Users className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-1">No students assigned</h3>
+                  <p className="text-slate-500 text-sm">The administration has not assigned any mentees to your roster yet.</p>
                 </div>
               ) : (
                 <MentorRosterExplorer mentees={myMentees} />
@@ -201,31 +245,36 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
 
           {/* ================= TAB 2: MEETINGS ================= */}
           {activeTab === 'meetings' && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6" style={{ animationDelay: "100ms" }}>
               <MentorMeetingScheduler mentees={myMentees} />
               <MentorScheduledMeetings meetings={scheduledMeetings} />
             </div>
           )}
 
-          {/* ================= TAB 2: GLOBAL NOTICES ================= */}
+          {/* ================= TAB 3: GLOBAL NOTICES ================= */}
           {activeTab === 'notices' && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <h2 className="text-lg font-bold text-slate-800">Recent Broadcasts</h2>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-slate-500" />
+                    <h2 className="text-sm font-semibold text-slate-900">Recent Broadcasts</h2>
+                  </div>
                 </div>
                 <div className="p-6">
                   {(!notices || notices.length === 0) ? (
-                    <p className="text-center text-slate-500 py-8">No notices have been published yet.</p>
+                    <p className="text-center text-slate-500 py-8 text-sm">No notices have been published yet.</p>
                   ) : (
                     <div className="space-y-4">
                       {(notices as NoticeRecord[]).map((notice) => (
-                        <div key={notice.$id} className="rounded-lg border border-slate-200 bg-white p-5 transition-shadow hover:shadow-md">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-xs font-bold text-blue-700">N</span>
-                            <h3 className="font-bold text-slate-800 text-lg">{notice.title}</h3>
+                        <div key={notice.$id} className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-600 border border-slate-200">
+                              N
+                            </span>
+                            <h3 className="font-semibold text-slate-900 text-lg tracking-tight">{notice.title}</h3>
                           </div>
-                          <p className="text-slate-600 ml-11 mb-3">{notice.content}</p>
+                          <p className="text-slate-600 text-sm leading-relaxed ml-13">{notice.content}</p>
                         </div>
                       ))}
                     </div>
@@ -235,13 +284,14 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
             </div>
           )}
 
-          {/* ================= TAB 3: STUDENT PROFILE DOSSIER ================= */}
+          {/* ================= TAB 4: STUDENT PROFILE DOSSIER ================= */}
           {activeTab === 'student-profile' && selectedStudent && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6" style={{ animationDelay: "100ms" }}>
               
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                 <div className="flex items-center gap-6">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-blue-100 bg-blue-50 text-xl font-bold text-blue-700 shadow-sm">
+              {/* Profile Header Card */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm gap-4">
+                 <div className="flex items-center gap-5">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-xl font-bold text-slate-400 border border-slate-200">
                       {selectedStudent.profilePictureId ? (
                         <img 
                           src={getFileViewUrl(selectedStudent.profilePictureId)}
@@ -253,13 +303,13 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                       )}
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-900">{selectedStudent.fullName}</h2>
-                      <p className="text-slate-500 font-medium">{selectedStudent.email}</p>
-                      <div className="flex gap-2 mt-2">
-                         <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-bold border border-slate-200">
+                      <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{selectedStudent.fullName}</h2>
+                      <p className="text-slate-500 text-sm font-medium mt-0.5">{selectedStudent.email}</p>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                         <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium border border-slate-200">
                            {selectedStudent.department || "N/A"}
                          </span>
-                         <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-md text-xs font-bold border border-green-200">
+                         <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium border border-emerald-200">
                            Verified Student
                          </span>
                       </div>
@@ -268,117 +318,122 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                  
                  <Link 
                     href={`?tab=log-meeting&id=${selectedStudent.$id}`}
-                    className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
+                    className="shrink-0 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 text-center"
                  >
-                    Log New Meeting
+                    Log New Session
                  </Link>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                  
-                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-lg font-bold text-slate-800">
-                      Academic Overview
+                 {/* Academic Overview */}
+                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
+                      <GraduationCap className="w-4 h-4 text-slate-400" /> Academic Overview
                     </h3>
                     <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Roll Number</p>
-                         <p className="font-semibold text-slate-800">{selectedStudent.rollNo || "Not Provided"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Roll Number</p>
+                         <p className="font-semibold text-slate-900 text-sm">{selectedStudent.rollNo || "Not Provided"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Current Semester</p>
-                         <p className="font-semibold text-slate-800">Semester {selectedStudent.semester || "N/A"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Current Semester</p>
+                         <p className="font-semibold text-slate-900 text-sm">Semester {selectedStudent.semester || "N/A"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Current CGPA</p>
-                         <p className="font-semibold text-slate-800 text-lg">{selectedStudent.cgpa || "N/A"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Current CGPA</p>
+                         <p className="font-semibold text-slate-900 text-lg">{selectedStudent.cgpa || "N/A"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Latest SPI</p>
-                         <p className="font-semibold text-slate-800 text-lg">{latestAcademicRecord?.spi || "N/A"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Latest SPI</p>
+                         <p className="font-semibold text-slate-900 text-lg">{latestAcademicRecord?.spi || "N/A"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Latest CPI</p>
-                         <p className="font-semibold text-slate-800 text-lg">{latestAcademicRecord?.cpi || "N/A"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Latest CPI</p>
+                         <p className="font-semibold text-slate-900 text-lg">{latestAcademicRecord?.cpi || "N/A"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Active Backlogs</p>
-                         <p className={`font-semibold text-lg ${Number(selectedStudent.backlogs) > 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Active Backlogs</p>
+                         <p className={`font-semibold text-lg ${Number(selectedStudent.backlogs) > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
                            {selectedStudent.backlogs || "0"}
                          </p>
                        </div>
                        <div className="col-span-2">
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Technical Interests</p>
-                         <p className="font-semibold text-slate-800">{selectedStudent.interests || "None listed."}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Technical Interests</p>
+                         <p className="font-medium text-slate-800 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedStudent.interests || "None listed."}</p>
                        </div>
                        <div className="col-span-2">
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Last Uploaded Academic Record</p>
-                         <p className="font-semibold text-slate-800">
+                         <p className="text-xs font-medium text-slate-500 mb-1">Last Uploaded Record</p>
+                         <p className="font-medium text-slate-800 text-sm">
                            {latestAcademicRecord?.semester
                              ? `Semester ${latestAcademicRecord.semester} - SPI ${latestAcademicRecord.spi || "N/A"}, CPI ${latestAcademicRecord.cpi || "N/A"}`
                              : "No academic record uploaded yet."}
                          </p>
                        </div>
                     </div>
-                    <div className="mt-6 flex gap-4 border-t border-slate-100 pt-4">
+                    <div className="mt-6 flex flex-wrap gap-4 border-t border-slate-100 pt-5">
                        <Link 
                           href={`?tab=student-academics&id=${selectedStudent.$id}`}
-                          className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+                          className="text-sm font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-4 py-2 rounded-lg border border-slate-200"
                        >
-                          View Full Academic History →
+                          <FileText className="w-4 h-4" /> View Full History
                        </Link>
                        <Link 
                           href={`?tab=student-achievements&id=${selectedStudent.$id}`}
-                          className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+                          className="text-sm font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-4 py-2 rounded-lg border border-slate-200"
                        >
-                          View Achievements →
+                          <Activity className="w-4 h-4" /> View Achievements
                        </Link>
                     </div>
                  </div>
 
-                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-lg font-bold text-slate-800">
-                      Logistics
+                 {/* Logistics */}
+                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
+                      <MapPin className="w-4 h-4 text-slate-400" /> Logistics
                     </h3>
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Blood Group</p>
-                         <div className="inline-flex items-center justify-center px-3 py-1 bg-red-50 text-red-700 font-bold rounded-lg border border-red-100">
+                         <p className="text-xs font-medium text-slate-500 mb-1">Blood Group</p>
+                         <div className="inline-flex items-center justify-center px-2.5 py-1 bg-amber-50 text-amber-700 font-semibold rounded-md border border-amber-200 text-sm">
                            {selectedStudent.bloodGroup || "Unknown"}
                          </div>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Housing Status</p>
-                         <p className="font-semibold text-slate-800">{selectedStudent.residentialStatus || "Day Scholar"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Housing Status</p>
+                         <p className="font-semibold text-slate-900 text-sm">{selectedStudent.residentialStatus || "Day Scholar"}</p>
                        </div>
                        <div>
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Student Phone</p>
-                         <p className="font-semibold text-slate-800">{selectedStudent.phone || "N/A"}</p>
+                         <p className="text-xs font-medium text-slate-500 mb-1">Student Phone</p>
+                         <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                           <Phone className="w-3.5 h-3.5 text-slate-400" /> {selectedStudent.phone || "N/A"}
+                         </p>
                        </div>
                     </div>
                  </div>
 
-                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-lg font-bold text-slate-800">
-                      Emergency & Guardian Contact
+                 {/* Emergency Contacts */}
+                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-3">
+                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
+                      <UserCircle className="w-4 h-4 text-slate-400" /> Emergency & Guardian Contact
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                          <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Father&apos;s Details</h4>
-                          <div className="space-y-2">
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Name:</span> {selectedStudent.fatherName || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Phone:</span> {selectedStudent.fatherPhone || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Email:</span> {selectedStudent.fatherEmail || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Occupation:</span> {selectedStudent.fatherOccupation || "N/A"}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                          <h4 className="font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-2 text-sm">Father&apos;s Details</h4>
+                          <div className="space-y-3">
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Name:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherName || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Phone:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherPhone || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Email:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherEmail || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Occupation:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherOccupation || "N/A"}</span></p>
                           </div>
                        </div>
-                       <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                          <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Mother&apos;s Details</h4>
-                          <div className="space-y-2">
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Name:</span> {selectedStudent.motherName || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Phone:</span> {selectedStudent.motherPhone || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Email:</span> {selectedStudent.motherEmail || "N/A"}</p>
-                             <p className="text-sm"><span className="font-semibold text-slate-600">Occupation:</span> {selectedStudent.motherOccupation || "N/A"}</p>
+                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                          <h4 className="font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-2 text-sm">Mother&apos;s Details</h4>
+                          <div className="space-y-3">
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Name:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherName || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Phone:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherPhone || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Email:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherEmail || "N/A"}</span></p>
+                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Occupation:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherOccupation || "N/A"}</span></p>
                           </div>
                        </div>
                     </div>
@@ -388,9 +443,9 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
             </div>
           )}
 
-          {/* ================= TAB 3.5: STUDENT ACADEMIC HISTORY ================= */}
+          {/* ================= TAB 5: STUDENT ACADEMIC HISTORY ================= */}
           {activeTab === 'student-academics' && selectedStudent && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
               <AcademicsManager
                 initialRecords={academicRecords}
                 profileId={selectedStudent.$id}
@@ -399,9 +454,9 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
             </div>
           )}
 
-          {/* ================= TAB 3.6: STUDENT ACHIEVEMENTS ================= */}
+          {/* ================= TAB 6: STUDENT ACHIEVEMENTS ================= */}
           {activeTab === 'student-achievements' && selectedStudent && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
               <AchievementsManager
                 initialRecords={achievementRecords}
                 profileId={selectedStudent.$id}
@@ -410,18 +465,18 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
             </div>
           )}
 
-          {/* ================= TAB 4: LOG NEW MEETING ================= */}
+          {/* ================= TAB 7: LOG NEW MEETING ================= */}
           {activeTab === 'log-meeting' && selectedStudent && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-2xl">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both max-w-2xl" style={{ animationDelay: "100ms" }}>
             
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <div className="mb-8 flex items-center gap-4 border-b border-slate-100 pb-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-sm font-bold text-blue-700 shadow-sm">
-                    M
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold text-slate-500 shadow-sm">
+                    <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-800">New Session Record</h3>
-                    <p className="text-slate-500 text-sm font-medium">Student: {selectedStudent.fullName}</p>
+                    <h3 className="text-xl font-semibold tracking-tight text-slate-900">New Session Record</h3>
+                    <p className="text-slate-500 text-sm font-medium mt-0.5">Student: {selectedStudent.fullName}</p>
                   </div>
                 </div>
 
@@ -440,14 +495,14 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                   redirect(`?tab=student-profile&id=${selectedStudent.$id}`);
                 }} className="space-y-6">
                   
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Meeting Date</label>
-                    <input type="date" name="date" required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Meeting Date</label>
+                      <input type="date" name="date" required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all" />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Discussion Topic</label>
-                      <select name="topic" required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Discussion Topic</label>
+                      <select name="topic" required className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all">
                         <option value="">Select a topic...</option>
                         <option value="Academic Guidance">Academic Guidance</option>
                         <option value="Project/Internship">Project & Internships</option>
@@ -458,18 +513,18 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Session Notes & Action Items</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Session Notes & Action Items</label>
                     <textarea 
                       name="description" 
                       required 
                       rows={5} 
-                      placeholder="Discussed strategies for improving CGPA in the upcoming mid-semesters. Advised the student to focus on core algorithms..."
-                      className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Discussed strategies for improving CGPA in the upcoming mid-semesters..."
+                      className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all text-sm leading-relaxed"
                     ></textarea>
                   </div>
 
-                  <div className="pt-4 flex justify-end">
-                    <button type="submit" className="rounded-lg bg-blue-600 px-8 py-3 font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
+                  <div className="pt-2 flex justify-end">
+                    <button type="submit" className="rounded-lg bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 focus:ring-offset-white">
                       Save Meeting Record
                     </button>
                   </div>

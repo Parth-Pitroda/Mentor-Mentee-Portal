@@ -42,12 +42,24 @@ const apiKey =
   process.env.APPWRITE_API_KEY ||
   process.env.NEXT_APPWRITE_KEY!;
 
+// Exported for diagnostics
+export const APPWRITE_ENDPOINT = endpoint;
+export const APPWRITE_PROJECT_ID = projectId;
+export const APPWRITE_API_KEY = apiKey;
+
 /**
  * Admin Client
  * Uses API Key
  * Can create users, query databases, etc.
  */
 export const createAdminClient = () => {
+  if (!projectId) {
+    console.error("Appwrite project id is not set (APPWRITE_PROJECT_ID / NEXT_PUBLIC_APPWRITE_PROJECT_ID)");
+  }
+  if (!apiKey) {
+    console.error("Appwrite API key is not set (APPWRITE_API_KEY / NEXT_APPWRITE_KEY)");
+  }
+  console.debug("Using Appwrite endpoint:", endpoint);
   return new Client()
     .setEndpoint(endpoint)
     .setProject(projectId)

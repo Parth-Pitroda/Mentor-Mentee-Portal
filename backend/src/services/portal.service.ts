@@ -683,7 +683,7 @@ export class PortalService {
     const latest = academics.documents.reduce((acc: any, record: any) => {
       if (record.studentId && !acc[record.studentId]) acc[record.studentId] = record;
       return acc;
-    }, {});
+    }, {} as any);
     return asJson(mentees.documents.map((mentee) => {
       const record = latest[mentee.$id];
       const profileCgpa = Number(mentee.cgpa || 0);
@@ -780,7 +780,7 @@ export class PortalService {
   }
 
   private static async getMentorActivity(mentorId: string, feedUserId: string) {
-    const pending = await this.getPendingApprovals({ mentorId }, { user: {}, profile: { role: "mentor", $id: mentorId } });
+    const pending = await this.getPendingApprovals({ mentorId }, { user: {}, profile: { role: "mentor", $id: mentorId } } as any);
     return [
       ...pending.meetingRequests.map((request: any) => makeActivity(request.$id, feedUserId, `${request.studentName || "A mentee"} requested a meeting${request.proposedDate || request.date ? ` on ${request.proposedDate || request.date}` : ""}${request.proposedTime ? ` at ${request.proposedTime}` : ""}.`, "meeting_request_pending", request.$id, request.$createdAt)),
       ...pending.meetings.map((meeting: any) => makeActivity(meeting.$id, feedUserId, `${meeting.studentName || "A mentee"} submitted a meeting log${meeting.topic ? ` for "${meeting.topic}"` : ""}.`, "meeting_log_submission", meeting.$id, meeting.$createdAt)),

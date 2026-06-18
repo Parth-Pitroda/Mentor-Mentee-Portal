@@ -3,8 +3,6 @@ import { getMenteeProfile, getProfileByEmail } from "@/lib/actions/student.actio
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import DashboardSidebarNav from "@/components/DashboardSidebarNav";
-import PortalTopNavbar from "@/components/PortalTopNavbar";
-
 
 type DashboardProfile = {
   $id: string;
@@ -14,6 +12,7 @@ type DashboardProfile = {
 };
 
 export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
   params,
@@ -48,7 +47,6 @@ export default async function DashboardLayout({
     if (targetProfile.mentorId === currentProfile.$id) {
       redirect(`/mentor-dashboard?tab=student-profile&id=${profileId}`);
     }
-
     redirect("/mentor-dashboard");
   }
 
@@ -69,37 +67,48 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <PortalTopNavbar userName={user.name || "User"} userEmail={user.email} />
-
-      <aside className="fixed top-16 z-20 hidden h-[calc(100vh-4rem)] w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="border-b border-slate-100 p-6">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Student Workspace</p>
-        </div>
-        <nav className="flex-1 p-4 space-y-1.5">
-          <DashboardSidebarNav profileId={profileId} />
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-200 selection:text-slate-900">
+      
+      {/* ================= FULL-HEIGHT SIDEBAR ================= */}
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
         
+        {/* BRANDING LOGO */}
+        <div className="flex h-24 shrink-0 items-center gap-4 border-b border-slate-100 px-6">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xl font-black text-white shadow-md">
+            P
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="text-lg font-bold tracking-tight text-slate-900 leading-tight">PDEU Portal</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">Student Workspace</p>
+          </div>
+        </div>
+
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 pt-6">
+          <DashboardSidebarNav profileId={profileId} />
         </nav>
         
-        <div className="p-4 border-t border-slate-100">
+        {/* USER PROFILE & LOGOUT */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
            <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 font-bold text-xs">
-                {user.name.charAt(0)}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white shadow-sm">
+                {user.name.charAt(0).toUpperCase()}
               </div>
-              <div className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-800 truncate">{user.name}</span>
-                <span className="block text-xs text-slate-500 truncate">{user.email}</span>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                <span className="truncate text-xs text-slate-500 font-medium">Student Account</span>
               </div>
            </div>
            <LogoutButton />
         </div>
       </aside>
-      <div className="flex min-h-screen flex-col pt-16 md:ml-[17rem]">
-        <main className="min-h-screen flex-1 bg-slate-50 p-6 lg:p-8">
+
+      {/* ================= MAIN CONTENT AREA ================= */}
+      <div className="flex min-h-screen flex-col md:ml-[17rem]">
+        <main className="flex-1 p-6 lg:p-10">
           {children}
         </main>
       </div>
     </div>
-    
   );
 }

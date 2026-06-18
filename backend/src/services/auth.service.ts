@@ -47,7 +47,8 @@ export class AuthService {
         role: assignedRole,
       };
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error("AuthService.signUp error:", error);
+      throw new Error(error?.message || String(error));
     }
   }
 
@@ -85,7 +86,8 @@ export class AuthService {
         role: userRole,
       };
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error("AuthService.signIn error:", error);
+      throw new Error(error?.message || String(error));
     }
   }
 
@@ -96,7 +98,8 @@ export class AuthService {
       await account.deleteSession("current");
       return { success: true };
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error("AuthService.logout error:", error);
+      throw new Error(error?.message || String(error));
     }
   }
 
@@ -106,6 +109,7 @@ export class AuthService {
       const account = new Account(sessionClient);
       return await account.get();
     } catch (error: any) {
+      console.error("AuthService.getUser error:", error);
       return null;
     }
   }
@@ -129,6 +133,7 @@ export class AuthService {
         profile: profiles.documents[0],
       };
     } catch (error: any) {
+      console.error("AuthService.validateSession error:", error);
       return null;
     }
   }

@@ -8,21 +8,21 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "express": "^5.2.1",
-    "cors": "^2.8.6",
-    "cookie-parser": "^1.4.7",
-    "dotenv": "^17.4.2",
-    "node-appwrite": "^23.1.0",
     "appwrite": "^24.2.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-appwrite": "^23.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "@types/node": "^20.19.41",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/cors": "^2.8.17",
-    "@types/cookie-parser": "^1.4.6",
+    "@types/node": "^20.19.43",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0"
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -3,6 +3,16 @@ import { getDashboardOverview } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import MeetingTableWrapper from "@/components/MeetingTableWrapper";
 import MeetingRequestForm from "@/components/MeetingRequestForm";
+import { 
+  Calendar, 
+  GraduationCap, 
+  Clock, 
+  UserCircle, 
+  AlertCircle,
+  CheckCircle2,
+  Video,
+  FileText
+} from "lucide-react";
 
 type MeetingRequest = {
   $id: string;
@@ -49,12 +59,12 @@ export default async function DashboardOverviewPage({
   if (!user) redirect("/sign-in");
 
   let profileData = null;
-  let meetings = [];
+  let meetings: any[] = [];
   let pendingMeetingRequests: MeetingRequest[] = [];
   let pendingAcademicApprovals: unknown[] = [];
   let pendingAchievementApprovals: unknown[] = [];
   let activeMeetings: ScheduledMeeting[] = [];
-  let academicData = null;
+  let academicData: any = null;
   let isMentor = false;
   let isOwnProfile = false;
   let mentorName = "Pending Assignment";
@@ -91,159 +101,184 @@ export default async function DashboardOverviewPage({
     console.error("Dashboard overview data fetch failed:", error);
   }
 
-  // Safe UI Fallbacks
   const displayDepartment = profileData?.department || "Pending Assignment";
   const studentName = profileData?.fullName || "Student";
   const totalPendingApprovals = pendingMeetingRequests.length + pendingAcademicApprovals.length + pendingAchievementApprovals.length;
 
   return (
-    <div className="mx-auto max-w-7xl animate-in fade-in duration-500">
-      <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto max-w-6xl">
+      
+      {/* HEADER SECTION */}
+      <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Student Dashboard</p>
-          <h2 className="mt-2 text-3xl font-bold leading-tight text-slate-950">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
             Welcome, {studentName}
-          </h2>
-          <p className="mt-1 text-sm font-medium text-slate-500">
+          </h1>
+          <p className="mt-1.5 text-sm font-medium text-slate-500">
             Pandit Deendayal Energy University / {displayDepartment}
           </p>
         </div>
-        <span className={`w-fit rounded-lg border px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${
-          profileData?.isVerified
-            ? "border-green-200 bg-green-50 text-green-700"
-            : "border-yellow-200 bg-yellow-50 text-yellow-700"
-        }`}>
-          {profileData?.isVerified ? "Verified" : "Verification Pending"}
-        </span>
+        <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold tracking-wide bg-white shadow-sm">
+          {profileData?.isVerified ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span className="text-slate-700">Verified Profile</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+              <span className="text-slate-700">Verification Pending</span>
+            </>
+          )}
+        </div>
       </div>
 
+      {/* MAIN CONTENT */}
       {!profileData?.isVerified && !isMentor ? (
-        <div className="max-w-2xl rounded-lg border border-yellow-200 bg-white p-8 shadow-sm">
-          <div className="mb-5 h-1.5 w-20 rounded-full bg-yellow-400" />
-          <h3 className="text-xl font-bold text-slate-900">Verification Pending</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Your onboarding details are under review. Once the administration verifies your account, your assigned faculty mentor and workspace tools will appear here.
+        <div className="max-w-2xl rounded-xl border border-amber-200 bg-amber-50/50 p-8 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+          <div className="mb-5 h-1.5 w-16 rounded-full bg-amber-400" />
+          <h3 className="text-lg font-semibold text-slate-900">Verification Pending</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            Your onboarding details are currently under review. Once the administration verifies your account, your assigned faculty mentor and full workspace tools will appear here.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className={`rounded-lg border p-6 shadow-sm md:col-span-3 ${
-                activeMeetings.length > 0 ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white"
-              }`}>
-                {activeMeetings.length > 0 ? (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Scheduled Meetings</p>
-                    <div className="mt-4 space-y-4">
-                      {activeMeetings.map((meeting) => {
-                        const details = getMeetingDetails(meeting);
-
-                        return (
-                          <div key={meeting.$id} className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                              <div className="min-w-0">
-                                <h3 className="text-2xl font-bold text-slate-950">{meeting.topic || "Scheduled Meeting"}</h3>
-                                <p className="mt-2 text-sm font-semibold text-slate-600">
-                                  {meeting.date || "Date pending"}
-                                  {details.time ? ` at ${details.time}` : ""}
-                                  {details.mode ? ` / ${details.mode}` : ""}
-                                </p>
-                                <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                                  {details.agenda || "No agenda provided yet."}
-                                </p>
-                              </div>
-                              <div className="flex shrink-0 flex-col gap-2">
-                                <span className="w-fit rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-blue-700">
-                                  {meeting.status === "Pending" ? "Personal" : meeting.status || "Scheduled"}
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px] animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+          
+          {/* LEFT COLUMN: ACTIVE DASHBOARD DATA */}
+          <div className="space-y-8">
+            
+            {/* Active Meetings Card */}
+            <div className={`rounded-xl border shadow-sm p-6 sm:p-8 ${
+              activeMeetings.length > 0 ? "border-slate-200 bg-slate-900 text-white" : "border-slate-200 bg-white"
+            }`}>
+              {activeMeetings.length > 0 ? (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Calendar className="w-5 h-5 text-blue-400" />
+                    <p className="text-sm font-semibold tracking-wide text-blue-100">Next Scheduled Session</p>
+                  </div>
+                  <div className="space-y-4">
+                    {activeMeetings.map((meeting) => {
+                      const details = getMeetingDetails(meeting);
+                      return (
+                        <div key={meeting.$id} className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+                          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <h3 className="text-2xl font-semibold tracking-tight text-white">{meeting.topic || "Mentorship Session"}</h3>
+                              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-medium text-slate-300">
+                                <span className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-md">
+                                  <Clock className="w-4 h-4" /> {meeting.date || "Date pending"} {details.time ? `• ${details.time}` : ""}
                                 </span>
-                                {details.link && (
-                                  <a
-                                    href={details.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
-                                  >
-                                    Open Meeting Link
-                                  </a>
+                                {details.mode && (
+                                  <span className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-md">
+                                    <Video className="w-4 h-4" /> {details.mode}
+                                  </span>
                                 )}
                               </div>
+                              <p className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-slate-400">
+                                <span className="text-slate-300 font-semibold">Agenda: </span>
+                                {details.agenda || "No agenda provided yet."}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col gap-3">
+                              <span className="w-fit rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-400">
+                                {meeting.status === "Pending" ? "Personal" : meeting.status || "Scheduled"}
+                              </span>
+                              {details.link && (
+                                <a
+                                  href={details.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-fit rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                                >
+                                  Join Meeting
+                                </a>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Scheduled Meetings</p>
-                    <h3 className="mt-2 text-2xl font-bold text-slate-950">No meeting scheduled</h3>
-                    <p className="mt-2 text-sm font-medium text-slate-500">Your mentor has not scheduled an active meeting for you right now.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:col-span-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Current Academics</p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <p className="text-2xl font-bold text-slate-900">
-                    {academicData?.semester ? `Semester ${academicData.semester}` : "No Results Uploaded"}
-                  </p>
-                  <div className="flex gap-2">
-                    <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">CPI {academicData?.cpi || "N/A"}</span>
-                    <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">SPI {academicData?.spi || "N/A"}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-
-              {!isMentor && (
-                <div className={`rounded-lg border p-5 shadow-sm md:col-span-3 ${
-                  totalPendingApprovals > 0 ? "border-yellow-200 bg-yellow-50" : "border-slate-200 bg-white"
-                }`}>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className={`text-xs font-bold uppercase tracking-wider ${
-                        totalPendingApprovals > 0 ? "text-yellow-700" : "text-slate-400"
-                      }`}>
-                        Pending Approvals
-                      </p>
-                      <h3 className="mt-2 text-2xl font-bold text-slate-950">
-                        {totalPendingApprovals} item{totalPendingApprovals === 1 ? "" : "s"} awaiting mentor action
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-lg border border-yellow-200 bg-white px-3 py-1.5 text-xs font-bold text-yellow-700">
-                        Meetings {pendingMeetingRequests.length}
-                      </span>
-                      <span className="rounded-lg border border-yellow-200 bg-white px-3 py-1.5 text-xs font-bold text-yellow-700">
-                        Academics {pendingAcademicApprovals.length}
-                      </span>
-                      <span className="rounded-lg border border-yellow-200 bg-white px-3 py-1.5 text-xs font-bold text-yellow-700">
-                        Achievements {pendingAchievementApprovals.length}
-                      </span>
-                    </div>
+              ) : (
+                <div className="py-2">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Calendar className="w-5 h-5 text-slate-400" />
+                    <p className="text-sm font-semibold tracking-wide text-slate-900">Scheduled Meetings</p>
                   </div>
+                  <h3 className="text-xl font-semibold tracking-tight text-slate-900">No upcoming sessions</h3>
+                  <p className="mt-1.5 text-sm font-medium text-slate-500">Your mentor has not scheduled any active meetings at this time.</p>
                 </div>
               )}
             </div>
 
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              
+              {/* Academics Overview Card */}
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-6">
+                  <GraduationCap className="w-5 h-5 text-slate-400" />
+                  <p className="text-sm font-semibold text-slate-900">Current Academics</p>
+                </div>
+                <div className="mt-2">
+                  <p className="text-2xl font-semibold tracking-tight text-slate-900 mb-4">
+                    {academicData?.semester ? `Semester ${academicData.semester}` : "No Data"}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm font-medium text-slate-700">CPI: {academicData?.cpi || "N/A"}</span>
+                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm font-medium text-slate-700">SPI: {academicData?.spi || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Approvals Tracker */}
+              {!isMentor && (
+                <div className={`rounded-xl border p-6 shadow-sm ${
+                  totalPendingApprovals > 0 ? "border-amber-200 bg-amber-50/30" : "border-slate-200 bg-white"
+                }`}>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Clock className={`w-5 h-5 ${totalPendingApprovals > 0 ? "text-amber-500" : "text-slate-400"}`} />
+                    <p className="text-sm font-semibold text-slate-900">Awaiting Approval</p>
+                  </div>
+                  <h3 className="text-2xl font-semibold tracking-tight text-slate-900 mb-4">
+                    {totalPendingApprovals} pending item{totalPendingApprovals === 1 ? "" : "s"}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                      Meetings: {pendingMeetingRequests.length}
+                    </span>
+                    <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                      Academics: {pendingAcademicApprovals.length}
+                    </span>
+                    <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                      Achievements: {pendingAchievementApprovals.length}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Pending Requests List */}
             {!isMentor && pendingMeetingRequests.length > 0 && (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-100 px-5 py-4">
-                  <h3 className="font-bold text-slate-900">Pending Meeting Requests</h3>
-                  <p className="mt-1 text-xs text-slate-500">Waiting for mentor confirmation</p>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-5 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-900">Pending Meeting Requests</h3>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {pendingMeetingRequests.map((request) => (
-                    <div key={request.$id} className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
+                    <div key={request.$id} className="grid gap-4 px-6 py-5 md:grid-cols-[1fr_auto] md:items-center hover:bg-slate-50/50 transition-colors">
                       <div>
-                        <p className="font-semibold text-slate-900">
+                        <p className="font-semibold text-slate-900 text-sm">
                           {request.proposedDate || request.date || "Date pending"}
                           {request.proposedTime ? ` at ${request.proposedTime}` : ""}
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">{request.agenda || request.description}</p>
+                        <p className="mt-1 text-sm text-slate-500 line-clamp-1">{request.agenda || request.description}</p>
                       </div>
-                      <span className="w-fit rounded-lg border border-yellow-200 bg-yellow-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-yellow-700">
+                      <span className="w-fit rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                         Requested
                       </span>
                     </div>
@@ -252,28 +287,43 @@ export default async function DashboardOverviewPage({
               </div>
             )}
 
-            <MeetingTableWrapper initialMeetings={meetings} profileId={profileId} isMentor={isMentor} />
+            {/* General History Table */}
+            <div className="pt-4">
+              <MeetingTableWrapper initialMeetings={meetings} profileId={profileId} isMentor={isMentor} />
+            </div>
+
           </div>
 
-          <aside className="h-fit rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Primary Mentor</p>
-            <div className="mt-4 flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-blue-700">
-                {mentorName.charAt(0).toUpperCase()}
+          {/* RIGHT COLUMN: MENTOR SIDEBAR */}
+          <aside className="space-y-6">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sticky top-8">
+              <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
+                <UserCircle className="w-5 h-5 text-slate-400" />
+                <p className="text-sm font-semibold text-slate-900">Assigned Mentor</p>
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-slate-900">{mentorName}</p>
-                {mentorEmail && <p className="mt-1 truncate text-sm text-slate-500">{mentorEmail}</p>}
-                {mentorDepartment && <p className="mt-1 text-sm text-slate-500">{mentorDepartment}</p>}
-                {!profileData?.mentorId && (
-                  <p className="mt-2 text-sm text-slate-500">Awaiting faculty assignment.</p>
-                )}
+              
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg font-bold text-slate-400 border border-slate-200">
+                  {mentorName !== "Pending Assignment" ? mentorName.charAt(0).toUpperCase() : "?"}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold tracking-tight text-slate-900 text-lg">{mentorName}</p>
+                  {mentorEmail && <p className="mt-0.5 truncate text-sm text-slate-500">{mentorEmail}</p>}
+                  {mentorDepartment && <p className="mt-1.5 inline-flex text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">{mentorDepartment}</p>}
+                  {!profileData?.mentorId && (
+                    <p className="mt-2 text-sm text-amber-600 font-medium">Awaiting faculty assignment.</p>
+                  )}
+                </div>
               </div>
+              
+              {!isMentor && isOwnProfile && profileData?.mentorId && (
+                <div className="mt-8 pt-6 border-t border-slate-100">
+                  <MeetingRequestForm profileId={profileId} />
+                </div>
+              )}
             </div>
-            {!isMentor && isOwnProfile && profileData?.mentorId && (
-              <MeetingRequestForm profileId={profileId} />
-            )}
           </aside>
+
         </div>
       )}
     </div>

@@ -1,156 +1,210 @@
-"use client"; // ✅ 1. Turn this into a Client Component
+"use client";
 
-import Link from "next/link";
-import { signUpUser } from "@/lib/actions/auth.actions";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signUpUser } from "@/lib/actions/auth.actions";
+import toast from "react-hot-toast";
+import { motion } from "framer-motion";
+import Image from "next/image";
 
 export default function SignUpPage() {
   const router = useRouter();
   
-  // ✅ 2. Add state to capture errors and loading status
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ 3. Intercept the form submission to read the server response
   const clientAction = async (formData: FormData) => {
     setIsLoading(true);
-    setError(""); // Clear any previous errors
+    setError(""); 
+    
+    const toastId = toast.loading("Creating your account...");
 
     try {
       const result = (await signUpUser(formData)) as { success?: boolean; userId?: string; role?: string; error?: string };
       
-      // If the backend returns an error message, display it!
       if (result && !result.success) {
         setError(result.error || "Failed to create account. Please try again.");
+        toast.error("Registration failed.", { id: toastId });
         setIsLoading(false);
       } else if (result?.success) {
-        if (result.role === "admin" || result.role === "coordinator") {
-          router.push("/admin-dashboard");
-        } else if (result.role === "mentor") {
-          router.push("/mentor-dashboard");
-        } else {
-          router.push(result.userId ? `/dashboard/${result.userId}` : "/onboarding");
-        }
+        toast.success("Account created successfully!", { id: toastId });
+        
+        setTimeout(() => {
+          if (result.role === "admin" || result.role === "coordinator") {
+            router.push("/admin-dashboard");
+          } else if (result.role === "mentor") {
+            router.push("/mentor-dashboard");
+          } else {
+            router.push(result.userId ? `/dashboard/${result.userId}` : "/onboarding");
+          }
+        }, 300);
       }
     } catch {
       setError("An unexpected network error occurred.");
+      toast.error("Network error.", { id: toastId });
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-4">
-          <span className="text-white text-2xl font-bold">P</span>
+    <div className="min-h-screen w-full flex font-sans selection:bg-blue-100 selection:text-blue-900 bg-white">
+      
+      {/* LEFT PANEL: Campus Image Background */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center p-12">
+        
+        {/* Native Next.js Image Component */}
+        <Image 
+          src="campus.jpg" 
+          alt="PDEU Campus Background" 
+          fill 
+          priority
+          unoptimized={true}
+          sizes="(max-width: 1024px) 100vw, 50vw" 
+          className="object-cover object-center"
+        />
+        
+        {/* Dark Overlays for Text Readability - Lightened up! */}
+          <div className="absolute inset-0 bg-slate-900/30 z-10"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10"></div>
+
+        {/* Content Container */}
+        <div className="relative z-20 w-full max-w-lg">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-6">
+            Start your journey today
+          </h2>
+          <p className="text-lg text-slate-300 leading-relaxed font-medium">
+            Join the PDEU Mentor-Mentee Handshake platform to connect with peers, seek guidance, and unlock your academic potential.
+          </p>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
-          Already registered?{" "}
-          <Link href="/sign-in" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
-            Sign in here
-          </Link>
-        </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-sm sm:rounded-2xl border border-slate-200 sm:px-10">
+      {/* RIGHT PANEL: Authentication Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto overflow-x-hidden">
+        
+        {/* Slides in from the left (x: -20) */}
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="w-full max-w-md my-auto"
+        >
           
-          {/* ✅ 4. Beautiful Inline Error Banner */}
-          {error && (
-            <div className="mb-6 rounded-xl bg-red-50 p-4 border border-red-200 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <span className="text-red-500 font-bold">⚠️</span>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-bold text-red-800">Registration Failed</h3>
-                  <div className="mt-1 text-sm text-red-700 font-medium">
-                    <p>{error}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Mobile Header (Only visible on small screens) */}
+          <div className="lg:hidden mb-10 text-center">
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">PDEU Portal</h1>
+            <p className="text-slate-500 mt-2 text-sm font-medium">Create your account</p>
+          </div>
 
-          {/* ✅ 5. Attach the clientAction to the form */}
-          <form action={clientAction} className="space-y-6">
+          {/* Desktop Header */}
+          <div className="hidden lg:block mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Create your account</h1>
+            <p className="text-slate-500 mt-2 text-sm font-medium">Please fill in your details to register.</p>
+          </div>
+
+          <form action={clientAction} className="space-y-4">
             
-            {/* Full Name */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Full Legal Name</label>
+            {error && (
+              <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100 break-words flex items-start animate-in fade-in slide-in-from-top-2 duration-300">
+                <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                {error}
+              </div>
+            )}
+            
+            <div className="space-y-1.5">
+              <label htmlFor="name" className="block text-sm font-semibold text-slate-700">
+                Full Legal Name
+              </label>
               <input 
+                id="name"
                 type="text" 
                 name="name" 
                 required 
-                placeholder="Rahul Sharma"
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
+                disabled={isLoading}
+                placeholder="Rahul Sharma" 
+                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
               />
             </div>
 
-            {/* Roll Number */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Roll Number (For Students)</label>
+            <div className="space-y-1.5">
+              <label htmlFor="rollNo" className="block text-sm font-semibold text-slate-700">
+                Roll Number <span className="text-slate-400 font-normal">(For Students)</span>
+              </label>
               <input 
+                id="rollNo"
                 type="text" 
                 name="rollNo" 
-                placeholder="e.g. 24BCP413D"
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
+                disabled={isLoading}
+                placeholder="e.g. 24BCP413D" 
+                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
               />
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">University Email Address</label>
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
+                University Email Address
+              </label>
               <input 
+                id="email"
                 type="email" 
                 name="email" 
                 required 
-                placeholder="name@sot.pdpu.ac.in"
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
+                disabled={isLoading}
+                placeholder="name@sot.pdpu.ac.in" 
+                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
               />
-              <p className="text-xs text-slate-500 mt-1.5 font-medium">
+              <p className="text-xs text-slate-500 mt-1 font-medium">
                 Student and Faculty roles are assigned automatically based on email.
               </p>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
+                Password
+              </label>
               <input 
+                id="password"
                 type="password" 
                 name="password" 
                 required 
-                placeholder="••••••••"
                 minLength={8}
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
+                disabled={isLoading}
+                placeholder="••••••••" 
+                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
               />
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-2">
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Registering...
-                  </span>
-                ) : (
-                  "Register Account"
-                )}
-              </button>
-            </div>
-            
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="w-full py-3.5 mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md shadow-blue-600/20 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 active:scale-[0.98] disabled:bg-slate-400 disabled:shadow-none disabled:cursor-not-allowed flex justify-center items-center"
+            >
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Registering...
+                </>
+              ) : (
+                "Register Account"
+              )}
+            </button>
           </form>
 
-        </div>
+          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p className="text-sm text-slate-500 font-medium">
+              Already registered?{" "}
+              <Link href="/sign-in" className="text-blue-600 font-bold hover:text-blue-800 transition-colors">
+                Sign in here
+              </Link>
+            </p>
+          </div>
+          
+        </motion.div>
       </div>
     </div>
   );
