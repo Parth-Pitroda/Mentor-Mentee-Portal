@@ -15,70 +15,49 @@ export type MenteeCardStudent = {
   performanceScore?: number;
   performanceSource?: string;
   profilePictureId?: string;
+  interests?: string;
+  backlogs?: string | number;
 };
 
-export default function MenteeCard({ student }: { student: MenteeCardStudent }) {
-  // Helper to grab initials (e.g., "Rahul Sharma" -> "RS")
+
+export default function MenteeCard({ student, index = 0 }: { student: MenteeCardStudent; index?: number }) {
   const getInitials = (name?: string) => {
     if (!name) return "S";
     return name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
-  const performanceScore = Number(student.performanceScore || 0);
-
   return (
     <Link 
       href={`?tab=student-profile&id=${student.$id}`}
-      className="group relative flex cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-slate-200 bg-white p-5 text-center shadow-sm transition-all duration-200 hover:border-blue-300 hover:shadow-md"
+      style={{ animationDelay: `${index * 45}ms` }}
+      className="animate-fade-in-up group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-[0_12px_30px_rgba(59,130,246,0.08)] hover:-translate-y-1.5 transition-all duration-300"
     >
-      
-      {/* --- AVATAR --- */}
-      {/* Added group-hover:scale-105 so the image slightly zooms when hovering the card */}
-      <div className="relative z-10 mb-4 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-blue-100 bg-blue-50 text-xl font-bold text-blue-600 shadow-sm transition-colors group-hover:bg-blue-100">
+
+
+      {/* --- IMAGE TOP HALF --- */}
+      <div className="relative w-full h-48 bg-slate-50 overflow-hidden border-b border-slate-100 shrink-0">
         {student.profilePictureId ? (
           <img 
             src={getFileViewUrl(student.profilePictureId)}
             alt={`${student.fullName} Profile`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700"
           />
         ) : (
-          getInitials(student.fullName)
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 text-white text-4xl font-black tracking-wider group-hover:scale-108 transition-transform duration-700">
+            {getInitials(student.fullName)}
+          </div>
         )}
       </div>
 
-      {/* --- DETAILS --- */}
-      <div className="z-10 w-full">
-        <h3 className="truncate px-2 text-base font-bold text-slate-800 transition-colors group-hover:text-blue-700" title={student.fullName}>
+      {/* --- CONTENT BOTTOM HALF --- */}
+      <div className="p-4 flex flex-col justify-center flex-grow min-w-0">
+        <h3 className="text-base font-bold text-slate-800 tracking-tight group-hover:text-blue-600 transition-colors truncate" title={student.fullName}>
           {student.fullName || "Unnamed Student"}
         </h3>
-        <p className="mb-3 truncate px-2 text-sm text-slate-500" title={student.email}>
-          {student.email}
+        <p className="text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors duration-300 mt-1">
+          {student.rollNo || "No Roll Number"}
         </p>
-
-        {performanceScore > 0 && (
-          <div className="mx-auto mb-3 flex w-fit items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700">
-            <span>{student.performanceSource || "Score"}</span>
-            <span>{performanceScore.toFixed(2)}</span>
-          </div>
-        )}
-        
-        <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-          <div className="inline-flex items-center justify-center px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
-            {student.department || "Unassigned"}
-          </div>
-          {student.rollNo && (
-            <div className="inline-flex items-center justify-center px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
-              {student.rollNo}
-            </div>
-          )}
-          {student.semester && (
-            <div className="inline-flex items-center justify-center px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
-              Sem {student.semester}
-            </div>
-          )}
-        </div>
       </div>
-
     </Link>
   );
 }

@@ -72,7 +72,6 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
-          <p className="text-sm text-slate-500">Stay updated with your academic and mentoring activities</p>
         </div>
         <div className="flex gap-3">
           <button

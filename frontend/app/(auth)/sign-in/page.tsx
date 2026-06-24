@@ -5,13 +5,59 @@ import Link from "next/link";
 import { signInUser } from "@/lib/actions/auth.actions";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import Image from "next/image";
+import { motion, useMotionValue, useSpring } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
+
+const containerVariants = {
+  hidden: { opacity: 0, x: 60 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 20,
+      mass: 1,
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+} as const;
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: "easeOut",
+    },
+  },
+} as const;
 
 export default function SignInPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Track cursor position with spring values for Google Labs-style trailing inertia
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const springConfig = { damping: 40, stiffness: 220, mass: 0.6 };
+  const spotlightX = useSpring(mouseX, springConfig);
+  const spotlightY = useSpring(mouseY, springConfig);
+
+  const [isHovering, setIsHovering] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Offset by -150 to keep the center of the 300px spotlight aligned with cursor
+    mouseX.set(e.clientX - rect.left - 150);
+    mouseY.set(e.clientY - rect.top - 150);
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,70 +96,75 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex font-sans selection:bg-blue-100 selection:text-blue-900 bg-white">
-      
-     {/* LEFT PANEL: Campus Image Background */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center p-12">
+    <div 
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      className="pointer-events-auto w-full md:w-1/2 lg:w-[45%] xl:w-[40%] bg-white flex flex-col justify-between p-8 md:p-12 lg:p-16 relative overflow-hidden shrink-0 z-10 h-full"
+    >
         
-        {/* Standard HTML Image Tag - Bypasses Next.js Optimization */}
-        <img 
-          src="/campus.jpg" 
-          alt="PDEU Campus" 
-          className="absolute inset-0 w-full h-full object-cover object-center"
-        />
-        
-        {/* Dark Overlays for Text Readability - Lightened up! */}
-          <div className="absolute inset-0 bg-slate-900/30 z-10"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10"></div>
-
-        {/* Content Container (z-20 ensures the text is on top of the overlays) */}
-        <div className="relative z-20 w-full max-w-lg">
-          <h2 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-6">
-            PDEU Mentor-Mentee Portal
-          </h2>
-          <p className="text-lg text-slate-300 leading-relaxed font-medium">
-            The PDEU Mentor-Mentee Handshake portal is designed to foster growth, streamline communication, and build lasting academic relationships.
-          </p>
-
-          
-        </div>
-      </div>
-
-      {/* RIGHT PANEL: Authentication Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto overflow-x-hidden">
-        
+        {/* Google Labs Spotlight Glow following cursor with Liquid-Spring inertia */}
         <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="w-full max-w-md my-auto"
+          style={{
+            x: spotlightX,
+            y: spotlightY,
+          }}
+          animate={{ opacity: isHovering ? 1 : 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="absolute w-[300px] h-[300px] bg-blue-500/[0.04] rounded-full blur-[65px] pointer-events-none z-0 hidden md:block left-0 top-0"
+        />
+
+        {/* Top Header Branding Row (Fade In Entry) */}
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="flex items-center justify-between w-full z-10 select-none"
         >
-          
-          {/* Mobile Header (Only visible on small screens) */}
-          <div className="lg:hidden mb-10 text-center">
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">PDEU Portal</h1>
-            <p className="text-slate-500 mt-2 text-sm font-medium">Mentor-Mentee Handshake</p>
-          </div>
+          <img 
+            src="/pdeu_logo_new.png" 
+            alt="PDEU Logo" 
+            className="h-12 w-auto object-contain select-none"
+          />
+          <Link 
+            href="/sign-up" 
+            className="px-6 py-2 border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white rounded-xl text-sm font-semibold transition-all duration-300"
+          >
+            Sign Up
+          </Link>
+        </motion.div>
 
-          {/* Desktop Header */}
-          <div className="hidden lg:block mb-10">
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
-            <p className="text-slate-500 mt-2 text-sm font-medium">Please enter your credentials to access your dashboard.</p>
-          </div>
+        {/* Central Login Card (Staggered Animation Entry) */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-[381px] mx-auto my-auto flex flex-col gap-10 z-10"
+        >
+          {/* Form Headers */}
+          <motion.div variants={itemVariants} className="flex flex-col gap-1 select-none">
+            <span className="text-slate-500 text-sm font-medium">Welcome back!!</span>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Please Sign In</h1>
+          </motion.div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Sign In Form */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {errorMsg && (
-              <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100 break-words flex items-start">
-                <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <motion.div 
+                variants={itemVariants}
+                className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold break-words flex items-start"
+              >
+                <svg className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 {errorMsg}
-              </div>
+              </motion.div>
             )}
-            
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
-                University Email
+
+            {/* Email Field */}
+            <motion.div variants={itemVariants} className="flex flex-col gap-2 w-full">
+              <label htmlFor="email" className="text-sm font-semibold text-slate-700">
+                Email address
               </label>
               <input 
                 id="email"
@@ -121,59 +172,94 @@ export default function SignInPage() {
                 name="email" 
                 type="email" 
                 disabled={isLoading}
-                placeholder="24bcp...@sot.pdpu.ac.in" 
-                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
+                placeholder="Enter email address" 
+                className="w-full px-4 py-3.5 bg-white hover:bg-slate-50/40 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/25 focus:shadow-[0_0_18px_-3px_rgba(59,130,246,0.12)] rounded-xl outline-none text-slate-800 placeholder:text-slate-400 text-sm font-poppins transition-all duration-300 shadow-sm" 
               />
-            </div>
+            </motion.div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
-                  Password
-                </label>
-                <span className="text-xs font-medium text-blue-600 hover:text-blue-800 cursor-pointer transition-colors">Forgot password?</span>
+            {/* Password Field */}
+            <motion.div variants={itemVariants} className="flex flex-col gap-2 w-full">
+              <label htmlFor="password" className="text-sm font-semibold text-slate-700">
+                Password
+              </label>
+              <div className="relative flex items-center w-full">
+                <input 
+                  id="password"
+                  required 
+                  name="password" 
+                  type={showPassword ? "text" : "password"}
+                  disabled={isLoading}
+                  placeholder="••••••••••••" 
+                  className="w-full pl-4 pr-12 py-3.5 bg-white hover:bg-slate-50/40 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/25 focus:shadow-[0_0_18px_-3px_rgba(59,130,246,0.12)] rounded-xl outline-none text-slate-800 placeholder:text-slate-300 text-sm font-poppins transition-all duration-300 shadow-sm" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
-              <input 
-                id="password"
-                required 
-                name="password" 
-                type="password" 
-                disabled={isLoading}
-                placeholder="••••••••" 
-                className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all duration-200 disabled:opacity-50 text-slate-900 placeholder:text-slate-400 shadow-sm" 
-              />
-            </div>
+            </motion.div>
 
-            <button 
-              type="submit" 
-              disabled={isLoading} 
-              className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md shadow-blue-600/20 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 active:scale-[0.98] disabled:bg-slate-400 disabled:shadow-none disabled:cursor-not-allowed flex justify-center items-center"
+            {/* Checkbox and Forgot Link */}
+            <motion.div variants={itemVariants} className="flex justify-between items-center w-full text-sm mt-1">
+              <label className="flex items-center gap-2 text-slate-600 select-none cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
+                />
+                <span>Remember me</span>
+              </label>
+              <span className="text-[#2B6CB0] hover:underline cursor-pointer font-semibold">
+                I forgot my password
+              </span>
+            </motion.div>
+
+            {/* Sign In Button Wrapper with moving border gradient on hover */}
+            <motion.div 
+              variants={itemVariants}
+              className="relative p-[1.5px] rounded-xl overflow-hidden mt-3 group-btn w-full shadow-md"
             >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Verifying Credentials...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
+              {/* Rotating conic gradient for high-tech border glow */}
+              <div className="absolute -inset-[300%] bg-[conic-gradient(from_0deg,transparent_30%,#93C5FD_50%,transparent_70%)] animate-[spin_4s_linear_infinite] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              
+              <motion.button 
+                whileHover={{ scale: 1.005 }}
+                whileTap={{ scale: 0.985 }}
+                type="submit" 
+                disabled={isLoading} 
+                className="relative w-full py-3.5 bg-gradient-to-r from-[#3182CE] to-[#2B6CB0] hover:from-[#2B6CB0] hover:to-[#1A365D] text-white rounded-[11px] font-bold text-sm tracking-wide active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center cursor-pointer overflow-hidden"
+              >
+                {/* Horizontal white sheen sweep on hover */}
+                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full btn-shimmer pointer-events-none" />
 
-          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-500 font-medium">
-              Don't have an account?{" "}
-              <Link href="/sign-up" className="text-blue-600 font-bold hover:text-blue-800 transition-colors">
-                Register here
-              </Link>
-            </p>
-          </div>
-          
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Signing In...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </motion.button>
+            </motion.div>
+          </form>
         </motion.div>
-      </div>
+
+        {/* Small Footer copyright */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.65 }}
+          className="text-xs text-slate-400 font-medium select-none z-10 w-full text-center"
+        >
+          © {new Date().getFullYear()} PDEU ERP System. All rights reserved.
+        </motion.div>
+        
     </div>
   );
 }

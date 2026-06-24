@@ -11,7 +11,12 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-20">
-      <div className="p-6 border-b border-slate-100">
+      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+        <img 
+          src="/pdeu_logo.png" 
+          alt="PDEU Logo" 
+          className="w-10 h-10 object-cover object-left"
+        />
         <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
       </div>
       
@@ -71,22 +76,8 @@ export default function Sidebar({ profileId, userName }: { profileId: string, us
         </Link>
       </nav>
 
-     <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-         {/* 1. Your Avatar and Name */}
-         <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              {userName.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-bold text-slate-800 truncate">{userName}</span>
-              <span className="text-xs text-slate-500 font-medium tracking-wide">Mentee Portal</span>
-            </div>
-         </div>
-         
-         {/* 2. THE SIGN OUT BUTTON GOES HERE! */}
-         <div className="px-1">
-            <LogoutButton />
-         </div>
+      <div className="p-4 border-t border-slate-100">
+         <LogoutButton variant="sidebar-light" />
       </div>
     </aside>
   );

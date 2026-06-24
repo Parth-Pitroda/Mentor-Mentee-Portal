@@ -23,9 +23,6 @@ export default async function AcademicsPage({
     <div className="animate-in fade-in duration-500">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-slate-900 leading-tight">Document Verification</h2>
-        <p className="text-slate-500 mt-1 font-medium">
-          Manage and verify university marksheets and performance metrics.
-        </p>
       </div>
 
       <AcademicsManager 

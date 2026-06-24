@@ -24,9 +24,6 @@ export default async function AchievementsPage({
     <div className="animate-in fade-in duration-500">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-slate-900 leading-tight">Extra-Curricular Achievements</h2>
-        <p className="text-slate-500 mt-1 font-medium">
-          Track and verify Hackathons, Internships, Exams, and Certifications.
-        </p>
       </div>
 
       <AchievementsManager 

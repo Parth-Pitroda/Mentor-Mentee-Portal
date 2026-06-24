@@ -23,7 +23,7 @@ export default function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-slate-400 hover:text-blue-600 bg-white border border-slate-200 shadow-sm transition-colors rounded-full hover:bg-blue-50 flex items-center justify-center"
+        className="relative p-2 text-slate-400 hover:text-slate-700 transition-colors rounded-full flex items-center justify-center focus:outline-none"
         title="View Notifications"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

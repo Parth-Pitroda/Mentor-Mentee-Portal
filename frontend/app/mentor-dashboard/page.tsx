@@ -8,17 +8,20 @@ import {
   getMentorScheduledMeetings, 
   getAcademicRecordsForProfile, 
   getAchievementRecordsForProfile, 
-  getPendingApprovals 
+  getPendingApprovals,
+  getMentorNote
 } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
-import MentorMeetingScheduler from "@/components/MentorMeetingScheduler";
-import MentorScheduledMeetings from "@/components/MentorScheduledMeetings";
+import MeetingsTabClient from "@/components/MeetingsTabClient";
 import AcademicsManager from "@/components/AcademicsManager";
 import AchievementsManager from "@/components/AchievementsManager";
 import MentorRosterExplorer from "@/components/MentorRosterExplorer";
+import MentorRosterCards from "@/components/MentorRosterCards";
+import HeaderSearchBar from "@/components/HeaderSearchBar";
+import MentorNotesEditor from "@/components/MentorNotesEditor";
 import { getFileViewUrl } from "@/lib/files";
 import type { NoticeRecord } from "@/types";
 import { 
@@ -32,12 +35,13 @@ import {
   Activity,
   MapPin,
   Phone,
-  FileText
+  FileText,
+  LayoutDashboard
 } from "lucide-react";
 
-export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string }> }) {
+export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string, q?: string }> }) {
   const searchParams = await props.searchParams;
-  const activeTab = searchParams.tab || "roster";
+  const activeTab = searchParams.tab || "dashboard";
   const studentId = searchParams.id;
 
   const user = await getLoggedInUser();
@@ -61,13 +65,21 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   let latestAcademicRecord = null;
   let academicRecords = [];
   let achievementRecords = [];
+  let mentorNote = null;
   if ((activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements') && studentId) {
     selectedStudent = await getMenteeProfile(studentId);
     if (selectedStudent?.mentorId !== user.$id) {
       selectedStudent = null;
     }
     if (selectedStudent && activeTab === 'student-profile') {
-      latestAcademicRecord = await getLatestAcademicRecord(studentId);
+      const [latAcad, noteRes, achRes] = await Promise.all([
+        getLatestAcademicRecord(studentId),
+        getMentorNote(studentId),
+        getAchievementRecordsForProfile(studentId)
+      ]);
+      latestAcademicRecord = latAcad;
+      mentorNote = noteRes;
+      achievementRecords = achRes;
     } else if (selectedStudent && activeTab === 'student-academics') {
       academicRecords = await getAcademicRecordsForProfile(studentId);
     } else if (selectedStudent && activeTab === 'student-achievements') {
@@ -79,10 +91,26 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     redirect("/mentor-dashboard");
   }
 
+  const initialNoteContent = mentorNote?.content || "";
+  const initialCollectionMissing = !!mentorNote?.collectionMissing;
+
+  const getInitials = (name?: string) => {
+    if (!name) return "S";
+    return name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const studentMeetings = selectedStudent 
+    ? (scheduledMeetings || []).filter((m: any) => m.studentId === selectedStudent.$id || m.studentName === selectedStudent.fullName)
+    : [];
+  const totalMeetingsCount = studentMeetings.length;
+
   // Dynamic Header Logic
-  let pageTitle = "Mentee Roster";
-  let pageDesc = "Manage your assigned students and track their progress.";
-  if (activeTab === 'notices') {
+  let pageTitle = "Dashboard";
+  let pageDesc = "Overview of your mentees' performance, upcoming sessions, and recent activities.";
+  if (activeTab === 'roster') {
+    pageTitle = "My Mentees";
+    pageDesc = "Manage your assigned students and track their progress.";
+  } else if (activeTab === 'notices') {
     pageTitle = "University Notices";
     pageDesc = "Important updates and deadlines from the administration.";
   } else if (activeTab === 'meetings') {
@@ -105,61 +133,94 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   const isRosterActive = activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements';
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-200 selection:text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-slate-200 selection:text-slate-900">
       
       {/* ================= FULL-HEIGHT SIDEBAR ================= */}
-      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-64 flex-col bg-[#1A1A24] text-white md:flex animate-in fade-in duration-300">
         
         {/* BRANDING LOGO */}
-        <div className="flex h-24 shrink-0 items-center gap-4 border-b border-slate-100 px-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xl font-black text-white shadow-md">
-            P
-          </div>
-          <div className="flex flex-col justify-center">
-            <p className="text-lg font-bold tracking-tight text-slate-900 leading-tight">PDEU Portal</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">Faculty Workspace</p>
-          </div>
+        <div className="flex h-24 shrink-0 items-center justify-center border-b border-white/5 px-6">
+          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-14 w-auto object-contain" />
         </div>
 
         {/* NAVIGATION */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 pt-6">
+        <nav className="flex-1 overflow-y-auto py-6 pl-4 pr-0 space-y-1.5">
+          <Link 
+            href="?tab=dashboard" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'dashboard' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>Dashboard</span>
+            {activeTab === 'dashboard' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
+          </Link>
+
           <Link 
             href="?tab=roster" 
-            className={`group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${isRosterActive ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              isRosterActive 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
           >
-            <div className="flex items-center">
-              <Users className={`w-5 h-5 mr-3 transition-colors ${isRosterActive ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-              <span>My Mentees</span>
-            </div>
-            {myMentees && myMentees.length > 0 && (
-              <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold shadow-sm ${
-                isRosterActive
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-200 text-slate-700'
-              }`}>
-                {myMentees.length}
-              </span>
+            <span>My Mentees</span>
+            {isRosterActive && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
             )}
           </Link>
 
           <Link 
             href="?tab=meetings" 
-            className={`group flex items-center px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === 'meetings' ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'meetings' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
           >
-            <CalendarDays className={`w-5 h-5 mr-3 transition-colors ${activeTab === 'meetings' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-            Meetings
+            <span>Meetings</span>
+            {activeTab === 'meetings' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
 
           <Link 
             href="/mentor-dashboard/approvals" 
-            className="group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
           >
-            <div className="flex items-center">
-              <CheckSquare className="w-5 h-5 mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-              <span>Pending Approvals</span>
-            </div>
+            <span>Pending Approvals</span>
             {pendingApprovalCount > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white shadow-sm">
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-sm mr-2 animate-pulse">
                 {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
               </span>
             )}
@@ -167,30 +228,45 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
 
           <Link 
             href="?tab=notices" 
-            className={`group flex items-center px-4 py-3.5 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === 'notices' ? 'bg-slate-100 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'notices' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
           >
-            <Bell className={`w-5 h-5 mr-3 transition-colors ${activeTab === 'notices' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-            Global Notices
+            <span>Global Notices</span>
+            {activeTab === 'notices' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
         </nav>
         
         {/* USER PROFILE & LOGOUT */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+        <div className="p-4 border-t border-white/5 bg-transparent">
            <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white shadow-sm">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white shadow-sm">
                 {user.name ? user.name.charAt(0).toUpperCase() : "M"}
               </div>
               <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold text-slate-900">{user.name || "Faculty Member"}</span>
-                <span className="truncate text-xs text-slate-500 font-medium">Mentor Account</span>
+                <span className="truncate text-sm font-semibold text-white">{user.name || "Faculty Member"}</span>
+                <span className="truncate text-xs text-slate-400 font-medium">Mentor Account</span>
               </div>
            </div>
-           <div className="px-1"><LogoutButton /></div>
+           <div className="px-1"><LogoutButton variant="sidebar-dark" /></div>
         </div>
       </aside>
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <main className="min-h-screen p-6 lg:p-10 md:ml-[17rem]">
+      <main className="min-h-screen p-6 lg:p-10 md:ml-64">
         <div className="max-w-6xl mx-auto">
           
           {/* DYNAMIC HEADER & NOTIFICATIONS */}
@@ -216,15 +292,35 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
               <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
                 {pageTitle}
               </h1>
-              <p className="mt-1.5 text-sm font-medium text-slate-500">
-                {pageDesc}
-              </p>
             </div>
             
-            <div className="mb-2 lg:mb-0">
+            <div className="mb-2 lg:mb-0 flex items-center gap-4">
+              {activeTab === 'roster' && <HeaderSearchBar />}
               <NotificationBell />
             </div>
           </div>
+          {/* ================= TAB 0: DASHBOARD ================= */}
+          {activeTab === 'dashboard' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+              {(!myMentees || myMentees.length === 0) ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50">
+                    <Users className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-1">No students assigned</h3>
+                  <p className="text-slate-500 text-sm">The administration has not assigned any mentees to your roster yet.</p>
+                </div>
+              ) : (
+                <MentorRosterExplorer 
+                  mentees={myMentees} 
+                  showRosterTable={false} 
+                  meetings={scheduledMeetings} 
+                  pendingApprovalCount={pendingApprovalCount} 
+                  pendingApprovals={pendingApprovals} 
+                />
+              )}
+            </div>
+          )}
 
           {/* ================= TAB 1: MENTEE ROSTER ================= */}
           {activeTab === 'roster' && (
@@ -238,16 +334,18 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                   <p className="text-slate-500 text-sm">The administration has not assigned any mentees to your roster yet.</p>
                 </div>
               ) : (
-                <MentorRosterExplorer mentees={myMentees} />
+                <MentorRosterCards mentees={myMentees} searchQuery={searchParams.q || ""} />
               )}
             </div>
           )}
 
-          {/* ================= TAB 2: MEETINGS ================= */}
           {activeTab === 'meetings' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6" style={{ animationDelay: "100ms" }}>
-              <MentorMeetingScheduler mentees={myMentees} />
-              <MentorScheduledMeetings meetings={scheduledMeetings} />
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+              <MeetingsTabClient 
+                mentees={myMentees} 
+                scheduledMeetings={scheduledMeetings} 
+                meetingRequests={pendingApprovals.meetingRequests} 
+              />
             </div>
           )}
 
@@ -286,160 +384,203 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
 
           {/* ================= TAB 4: STUDENT PROFILE DOSSIER ================= */}
           {activeTab === 'student-profile' && selectedStudent && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6" style={{ animationDelay: "100ms" }}>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-8 select-none" style={{ animationDelay: "100ms" }}>
               
-              {/* Profile Header Card */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm gap-4">
-                 <div className="flex items-center gap-5">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-xl font-bold text-slate-400 border border-slate-200">
-                      {selectedStudent.profilePictureId ? (
-                        <img 
-                          src={getFileViewUrl(selectedStudent.profilePictureId)}
-                          alt={`${selectedStudent.fullName} Profile`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        selectedStudent.fullName.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{selectedStudent.fullName}</h2>
-                      <p className="text-slate-500 text-sm font-medium mt-0.5">{selectedStudent.email}</p>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                         <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium border border-slate-200">
-                           {selectedStudent.department || "N/A"}
-                         </span>
-                         <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium border border-emerald-200">
-                           Verified Student
-                         </span>
+              {/* --- MAIN GRID SECTION --- */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-start">
+                
+                {/* --- LEFT SECTION: GENERAL TEXT DETAILS --- */}
+                <div className="md:col-span-2 space-y-8">
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-850 mb-5 border-b border-slate-200 pb-2">Profile Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Course</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.department || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Full Name</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.fullName}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Roll Number</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.rollNo || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Semester</span>
+                        <span className="text-slate-900 font-extrabold">Semester {selectedStudent.semester || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Father&apos;s Name</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.fatherName || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Mother&apos;s Name</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.motherName || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Email Address</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.email}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Phone Number</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.phone || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Residential Status</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.residentialStatus || "Day Scholar"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Blood Group</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.bloodGroup || "Unknown"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Father&apos;s Phone</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.fatherPhone || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Mother&apos;s Phone</span>
+                        <span className="text-slate-900 font-extrabold">{selectedStudent.motherPhone || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm sm:col-span-2">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Technical Interests</span>
+                        <span className="text-slate-900 font-extrabold text-right max-w-[75%] truncate">{selectedStudent.interests || "No interests specified."}</span>
                       </div>
                     </div>
-                 </div>
-                 
-                 <Link 
-                    href={`?tab=log-meeting&id=${selectedStudent.$id}`}
-                    className="shrink-0 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 text-center"
-                 >
-                    Log New Session
-                 </Link>
+                  </div>
+
+                  {/* Private Notes Section */}
+                  <div className="mt-8">
+                    <MentorNotesEditor 
+                      studentId={selectedStudent.$id}
+                      initialContent={initialNoteContent}
+                      initialCollectionMissing={initialCollectionMissing}
+                    />
+                  </div>
+                </div>
+
+                {/* --- RIGHT SECTION: BIG IMAGE, DETAILS & ACTION (Borderless) --- */}
+                <div className="md:col-span-1 space-y-4 md:border-l md:border-slate-100 md:pl-10">
+                  <div className="w-full h-80 rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+                    {selectedStudent.profilePictureId ? (
+                      <img 
+                        src={getFileViewUrl(selectedStudent.profilePictureId)}
+                        alt={`${selectedStudent.fullName} Profile`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 text-white text-5xl font-black">
+                        {getInitials(selectedStudent.fullName)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Student Details under the photo */}
+                  <div className="space-y-1.5 pt-2 select-none">
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{selectedStudent.fullName}</h2>
+                    <div className="flex flex-col gap-1 text-slate-555 text-xs font-semibold">
+                      <p>Student ID : <b className="text-slate-800 font-bold">{selectedStudent.rollNo || "N/A"}</b></p>
+                      <p>Department : <b className="text-slate-800 font-bold">{selectedStudent.department || "N/A"}</b></p>
+                      <div className="pt-1">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded font-bold uppercase text-[9px] tracking-wider border ${
+                          selectedStudent.isVerified 
+                            ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
+                            : 'bg-amber-50 border-amber-100 text-amber-700'
+                        }`}>
+                          {selectedStudent.isVerified ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Verified
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              Pending Verification
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Verification toggle button sitting cleanly below the photo, only if NOT verified */}
+                  {!selectedStudent.isVerified && (
+                    <form action={async () => {
+                      "use server";
+                      const { toggleStudentVerification } = await import("@/lib/actions/student.actions");
+                      await toggleStudentVerification(selectedStudent.$id, selectedStudent.isVerified);
+                    }}>
+                      <button 
+                        type="submit" 
+                        className="w-full py-3 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 border cursor-pointer bg-slate-900 text-white hover:bg-slate-800 border-slate-950 shadow-md"
+                      >
+                        ✓ Mark as Verified
+                      </button>
+                    </form>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 
-                 {/* Academic Overview */}
-                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
-                      <GraduationCap className="w-4 h-4 text-slate-400" /> Academic Overview
-                    </h3>
-                    <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Roll Number</p>
-                         <p className="font-semibold text-slate-900 text-sm">{selectedStudent.rollNo || "Not Provided"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Current Semester</p>
-                         <p className="font-semibold text-slate-900 text-sm">Semester {selectedStudent.semester || "N/A"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Current CGPA</p>
-                         <p className="font-semibold text-slate-900 text-lg">{selectedStudent.cgpa || "N/A"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Latest SPI</p>
-                         <p className="font-semibold text-slate-900 text-lg">{latestAcademicRecord?.spi || "N/A"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Latest CPI</p>
-                         <p className="font-semibold text-slate-900 text-lg">{latestAcademicRecord?.cpi || "N/A"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Active Backlogs</p>
-                         <p className={`font-semibold text-lg ${Number(selectedStudent.backlogs) > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
-                           {selectedStudent.backlogs || "0"}
-                         </p>
-                       </div>
-                       <div className="col-span-2">
-                         <p className="text-xs font-medium text-slate-500 mb-1">Technical Interests</p>
-                         <p className="font-medium text-slate-800 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedStudent.interests || "None listed."}</p>
-                       </div>
-                       <div className="col-span-2">
-                         <p className="text-xs font-medium text-slate-500 mb-1">Last Uploaded Record</p>
-                         <p className="font-medium text-slate-800 text-sm">
-                           {latestAcademicRecord?.semester
-                             ? `Semester ${latestAcademicRecord.semester} - SPI ${latestAcademicRecord.spi || "N/A"}, CPI ${latestAcademicRecord.cpi || "N/A"}`
-                             : "No academic record uploaded yet."}
-                         </p>
-                       </div>
+              {/* --- BOTTOM SECTION: 3 BORDERLESS STATS COLUMNS --- */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-slate-200 pt-6">
+                
+                {/* Academics Stats Block */}
+                <div className="flex flex-col justify-between h-40">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1.5">Academics</h4>
+                    <div className="space-y-1.5 mt-2.5 text-[11px] font-bold text-slate-700">
+                      <p>Current CGPA : <span className="text-slate-900 font-extrabold">{selectedStudent.cgpa || "N/A"}</span></p>
+                      <p>Latest SPI : <span className="text-slate-900 font-extrabold">{latestAcademicRecord?.spi || "N/A"}</span></p>
+                      <p className={Number(selectedStudent.backlogs) > 0 ? "text-rose-500 font-extrabold" : "text-emerald-650"}>
+                        Backlogs : {selectedStudent.backlogs || 0}
+                      </p>
                     </div>
-                    <div className="mt-6 flex flex-wrap gap-4 border-t border-slate-100 pt-5">
-                       <Link 
-                          href={`?tab=student-academics&id=${selectedStudent.$id}`}
-                          className="text-sm font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-4 py-2 rounded-lg border border-slate-200"
-                       >
-                          <FileText className="w-4 h-4" /> View Full History
-                       </Link>
-                       <Link 
-                          href={`?tab=student-achievements&id=${selectedStudent.$id}`}
-                          className="text-sm font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-4 py-2 rounded-lg border border-slate-200"
-                       >
-                          <Activity className="w-4 h-4" /> View Achievements
-                       </Link>
-                    </div>
-                 </div>
+                  </div>
+                  <Link 
+                    href={`?tab=student-academics&id=${selectedStudent.$id}`} 
+                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-750 transition-all flex items-center gap-1 group/link"
+                  >
+                    View marksheets <span className="transform translate-x-0 group-hover/link:translate-x-1 transition-transform duration-200">&rarr;</span>
+                  </Link>
+                </div>
 
-                 {/* Logistics */}
-                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
-                      <MapPin className="w-4 h-4 text-slate-400" /> Logistics
-                    </h3>
-                    <div className="space-y-5">
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Blood Group</p>
-                         <div className="inline-flex items-center justify-center px-2.5 py-1 bg-amber-50 text-amber-700 font-semibold rounded-md border border-amber-200 text-sm">
-                           {selectedStudent.bloodGroup || "Unknown"}
-                         </div>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Housing Status</p>
-                         <p className="font-semibold text-slate-900 text-sm">{selectedStudent.residentialStatus || "Day Scholar"}</p>
-                       </div>
-                       <div>
-                         <p className="text-xs font-medium text-slate-500 mb-1">Student Phone</p>
-                         <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
-                           <Phone className="w-3.5 h-3.5 text-slate-400" /> {selectedStudent.phone || "N/A"}
-                         </p>
-                       </div>
+                {/* Achievements Stats Block */}
+                <div className="flex flex-col justify-between h-40">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1.5">Achievements</h4>
+                    <div className="space-y-1.5 mt-2.5 text-[11px] font-bold text-slate-700">
+                      <p>Total Submissions : <span className="text-slate-900 font-extrabold">{achievementRecords.length || 0}</span></p>
+                      <p className="text-purple-650">Categories : Technical, Cultural</p>
+                      <p>Verified status : Active</p>
                     </div>
-                 </div>
+                  </div>
+                  <Link 
+                    href={`?tab=student-achievements&id=${selectedStudent.$id}`} 
+                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-750 transition-all flex items-center gap-1 group/link"
+                  >
+                    View achievements <span className="transform translate-x-0 group-hover/link:translate-x-1 transition-transform duration-200">&rarr;</span>
+                  </Link>
+                </div>
 
-                 {/* Emergency Contacts */}
-                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-3">
-                    <h3 className="mb-6 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-semibold text-slate-900">
-                      <UserCircle className="w-4 h-4 text-slate-400" /> Emergency & Guardian Contact
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                          <h4 className="font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-2 text-sm">Father&apos;s Details</h4>
-                          <div className="space-y-3">
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Name:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherName || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Phone:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherPhone || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Email:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherEmail || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Occupation:</span> <span className="text-slate-900 font-medium">{selectedStudent.fatherOccupation || "N/A"}</span></p>
-                          </div>
-                       </div>
-                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                          <h4 className="font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-2 text-sm">Mother&apos;s Details</h4>
-                          <div className="space-y-3">
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Name:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherName || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Phone:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherPhone || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Email:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherEmail || "N/A"}</span></p>
-                             <p className="text-sm flex justify-between"><span className="font-medium text-slate-500">Occupation:</span> <span className="text-slate-900 font-medium">{selectedStudent.motherOccupation || "N/A"}</span></p>
-                          </div>
-                       </div>
+                {/* Meetings Stats Block */}
+                <div className="flex flex-col justify-between h-40">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1.5">Meetings Log</h4>
+                    <div className="space-y-1.5 mt-2.5 text-[11px] font-bold text-slate-700">
+                      <p>Total Sessions : <span className="text-slate-900 font-extrabold">{totalMeetingsCount}</span></p>
+                      <p className="text-indigo-650">Last session : {studentMeetings[0]?.date ? new Date(studentMeetings[0].date).toLocaleDateString() : "N/A"}</p>
                     </div>
-                 </div>
+                  </div>
+                  <Link 
+                    href={`?tab=log-meeting&id=${selectedStudent.$id}`} 
+                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-750 transition-all flex items-center gap-1 group/link"
+                  >
+                    Log mentorship session <span className="transform translate-x-0 group-hover/link:translate-x-1 transition-transform duration-200">&rarr;</span>
+                  </Link>
+                </div>
 
               </div>
+
             </div>
           )}
 

@@ -47,7 +47,7 @@ type MeetingGroup = {
   records: ScheduledMeeting[];
 };
 
-const REPORT_LOGO_PATH = "/pdeu.png";
+const REPORT_LOGO_PATH = "/pdeu_logo.png";
 
 function parseMeetingDetails(meeting: ScheduledMeeting) {
   const description = meeting.description || "";

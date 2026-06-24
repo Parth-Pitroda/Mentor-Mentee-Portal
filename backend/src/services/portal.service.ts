@@ -32,6 +32,13 @@ const noticesId = () => env("APPWRITE_NOTICES_COLLECTION_ID", "NEXT_PUBLIC_APPWR
 const notificationsId = () => env("APPWRITE_NOTIFICATIONS_COLLECTION_ID", "NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID");
 const settingsId = () => env("APPWRITE_SETTINGS_COLLECTION_ID", "NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID");
 const bucketId = () => env("APPWRITE_STORAGE_BUCKET_ID", "NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID");
+const mentorNotesId = () => {
+  try {
+    return env("APPWRITE_MENTOR_NOTES_COLLECTION_ID", "NEXT_PUBLIC_APPWRITE_MENTOR_NOTES_COLLECTION_ID");
+  } catch {
+    return "mentor_notes";
+  }
+};
 
 const asJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -577,7 +584,7 @@ export class PortalService {
   }
 
   static async createGlobalNotice({ title, content }: { title: string; content: string }, ctx: PortalContext) {
-    requireRole(ctx, ["admin", "coordinator"]);
+    requireRole(ctx, ["admin", "coordinator", "mentor"]);
     await adminDatabases().createDocument(databaseId(), noticesId(), ID.unique(), { title, content });
     return { success: true };
   }
@@ -855,5 +862,78 @@ export class PortalService {
       mentor,
       currentProfile: ctx.profile,
     });
+  }
+
+  static async getMentorNote({ studentId }: { studentId: string }, ctx: PortalContext) {
+    await requireAssignedMentor(ctx, studentId);
+    const db = adminDatabases();
+    try {
+      const notes = await db.listDocuments(
+        databaseId(),
+        mentorNotesId(),
+        [
+          Query.equal("studentId", [studentId]),
+          Query.equal("mentorId", [ctx.profile.$id]),
+          Query.limit(1)
+        ]
+      );
+      if (notes.total > 0) {
+        return asJson(notes.documents[0]);
+      }
+      return { content: "" };
+    } catch (error: any) {
+      console.warn("getMentorNote: failed to query notes (collection might not exist). error:", error.message);
+      return { content: "", collectionMissing: true };
+    }
+  }
+
+  static async saveMentorNote({ studentId, content }: { studentId: string; content: string }, ctx: PortalContext) {
+    await requireAssignedMentor(ctx, studentId);
+    const db = adminDatabases();
+    
+    let existingNoteId: string | null = null;
+    try {
+      const notes = await db.listDocuments(
+        databaseId(),
+        mentorNotesId(),
+        [
+          Query.equal("studentId", [studentId]),
+          Query.equal("mentorId", [ctx.profile.$id]),
+          Query.limit(1)
+        ]
+      );
+      if (notes.total > 0) {
+        existingNoteId = notes.documents[0].$id;
+      }
+    } catch (error: any) {
+      console.warn("saveMentorNote: failed to query existing note. collection might not exist. error:", error.message);
+      throw new Error(`The 'mentor_notes' collection is missing or not accessible in Appwrite database. Please create a collection with ID 'mentor_notes' (or set APPWRITE_MENTOR_NOTES_COLLECTION_ID) containing string attributes 'studentId', 'mentorId', and 'content'.`);
+    }
+
+    try {
+      if (existingNoteId) {
+        await db.updateDocument(
+          databaseId(),
+          mentorNotesId(),
+          existingNoteId,
+          { content }
+        );
+      } else {
+        await db.createDocument(
+          databaseId(),
+          mentorNotesId(),
+          ID.unique(),
+          {
+            studentId,
+            mentorId: ctx.profile.$id,
+            content
+          }
+        );
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error("Failed to save mentor note:", error);
+      throw new Error(`Failed to save mentor note: ${error.message}`);
+    }
   }
 }

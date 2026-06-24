@@ -50,30 +50,106 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
   ]);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       
       {/* ================= SIDEBAR ================= */}
-      <aside className="w-64 bg-slate-900 text-white hidden md:flex flex-col fixed h-full z-20">
-        <div className="p-6 border-b border-slate-800">
-          <h2 className="text-xl font-extrabold tracking-tight text-white">PDEU PORTAL</h2>
-          <span className="text-xs font-bold text-blue-400 uppercase tracking-wider mt-1 block">Administrator</span>
+      <aside className="w-64 bg-[#1A1A24] text-white hidden md:flex flex-col fixed h-full z-20">
+        <div className="flex h-24 shrink-0 flex-col items-center justify-center border-b border-white/5 px-6">
+          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-12 w-auto object-contain" />
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1 block">Administrator</span>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href="?tab=overview" className={`block px-4 py-2.5 rounded-lg font-bold transition-all ${activeTab === 'overview' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            System Overview
+        <nav className="flex-1 py-6 pl-4 pr-0 space-y-1.5">
+          <Link 
+            href="?tab=overview" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'overview' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-4 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>System Overview</span>
+            {activeTab === 'overview' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
-          <Link href="?tab=assignments" className={`block px-4 py-2.5 rounded-lg font-bold transition-all ${activeTab === 'assignments' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            Mentor Assignments
+          <Link 
+            href="?tab=assignments" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'assignments' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-4 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>Mentor Assignments</span>
+            {activeTab === 'assignments' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
-          <Link href="?tab=users" className={`block px-4 py-2.5 rounded-lg font-bold transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            User Database
+          <Link 
+            href="?tab=users" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'users' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-4 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>User Database</span>
+            {activeTab === 'users' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
-          <Link href="?tab=settings" className={`block px-4 py-2.5 rounded-lg font-bold transition-all ${activeTab === 'settings' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            Global Settings
+          <Link 
+            href="?tab=settings" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'settings' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-4 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>Global Settings</span>
+            {activeTab === 'settings' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
           </Link>
         </nav>
-        <div className="p-4 border-t border-slate-800">
-           <LogoutButton />
+        <div className="p-4 border-t border-white/5">
+           <LogoutButton variant="sidebar-dark" />
         </div>
       </aside>
 
@@ -86,7 +162,6 @@ export default async function AdminDashboardPage(props: { searchParams: Promise<
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight capitalize">
                 {activeTab.replace('-', ' ')}
               </h1>
-              <p className="text-slate-500 mt-1">Manage university data and mentor mappings.</p>
             </div>
             {activeTab === 'users' && (
                <ExportCSVButton data={exportData} filename={`pdeu-verified-students-${new Date().toISOString().split('T')[0]}.csv`} />

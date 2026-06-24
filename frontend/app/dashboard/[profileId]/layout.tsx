@@ -67,44 +67,29 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans selection:bg-slate-200 selection:text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-slate-200 selection:text-slate-900">
       
       {/* ================= FULL-HEIGHT SIDEBAR ================= */}
-      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-[17rem] flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-64 flex-col bg-[#1A1A24] text-white md:flex animate-in fade-in duration-300">
         
         {/* BRANDING LOGO */}
-        <div className="flex h-24 shrink-0 items-center gap-4 border-b border-slate-100 px-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xl font-black text-white shadow-md">
-            P
-          </div>
-          <div className="flex flex-col justify-center">
-            <p className="text-lg font-bold tracking-tight text-slate-900 leading-tight">PDEU Portal</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">Student Workspace</p>
-          </div>
+        <div className="flex h-24 shrink-0 items-center justify-center border-b border-white/5 px-6">
+          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-14 w-auto object-contain" />
         </div>
 
         {/* NAVIGATION */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 pt-6">
+        <nav className="flex-1 overflow-y-auto py-6 pl-4 pr-0 space-y-1.5">
           <DashboardSidebarNav profileId={profileId} />
         </nav>
         
-        {/* USER PROFILE & LOGOUT */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-           <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white shadow-sm">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold text-slate-900">{user.name}</span>
-                <span className="truncate text-xs text-slate-500 font-medium">Student Account</span>
-              </div>
-           </div>
-           <LogoutButton />
+        {/* LOGOUT BUTTON */}
+        <div className="p-4 border-t border-white/5 bg-transparent">
+           <LogoutButton variant="sidebar-dark" />
         </div>
       </aside>
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <div className="flex min-h-screen flex-col md:ml-[17rem]">
+      <div className="flex min-h-screen flex-col md:ml-64">
         <main className="flex-1 p-6 lg:p-10">
           {children}
         </main>

@@ -359,6 +359,8 @@ export async function createGlobalNotice(formData: FormData) {
       content: String(formData.get("content") || ""),
     });
     revalidatePath("/admin-dashboard");
+    revalidatePath("/mentor-dashboard");
+    revalidatePath("/");
     return result;
   } catch (error) {
     return okError(error, "Failed to post notice.");
@@ -581,5 +583,25 @@ export async function getDashboardOverview(profileId: string) {
   } catch (error) {
     console.error("Dashboard overview data fetch failed:", error);
     return null;
+  }
+}
+
+export async function getMentorNote(studentId: string) {
+  try {
+    return await portalAction<{ content: string; collectionMissing?: boolean } | null>("getMentorNote", { studentId });
+  } catch (error) {
+    console.error("Error fetching mentor note:", error);
+    return null;
+  }
+}
+
+export async function saveMentorNote(studentId: string, content: string) {
+  try {
+    const result = await portalAction<{ success: boolean; error?: string }>("saveMentorNote", { studentId, content });
+    revalidatePath(`/mentor-dashboard/student/${studentId}`);
+    revalidatePath(`/mentor-dashboard`);
+    return result;
+  } catch (error) {
+    return okError(error, "Failed to save mentor note.");
   }
 }

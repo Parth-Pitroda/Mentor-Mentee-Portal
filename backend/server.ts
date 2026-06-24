@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
+import path from "path";
+
+// Load .env from current working directory first, then fall back to repository root
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
 import app from "./app";
 

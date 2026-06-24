@@ -114,9 +114,6 @@ export default async function DashboardOverviewPage({
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
             Welcome, {studentName}
           </h1>
-          <p className="mt-1.5 text-sm font-medium text-slate-500">
-            Pandit Deendayal Energy University / {displayDepartment}
-          </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold tracking-wide bg-white shadow-sm">
           {profileData?.isVerified ? (

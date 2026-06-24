@@ -1,5 +1,4 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
-
 import { 
   getPendingApprovals, 
   updateMeetingStatus, 
@@ -10,11 +9,17 @@ import {
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import PortalTopNavbar from "@/components/PortalTopNavbar";
 import MeetingActionButtons from "@/components/MeetingActionButtons";
 import NotificationBell from "@/components/NotificationBell";
 import { getFileViewUrl } from "@/lib/files";
 import type { AcademicUploadRecord, AchievementRecord, Meeting } from "@/types";
+import { 
+  Users, 
+  CalendarDays, 
+  CheckSquare, 
+  Bell, 
+  LayoutDashboard 
+} from "lucide-react";
 
 type ApprovalRecord = {
   $id: string;
@@ -59,56 +64,89 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <PortalTopNavbar userName={user.name || "Faculty Mentor"} userEmail={user.email} />
+    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-slate-200 selection:text-slate-900">
       
-      {/* SIDEBAR FOR MENTOR */}
-      <aside className="fixed top-16 z-20 hidden h-[calc(100vh-4rem)] w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">PDEU PORTAL</h2>
+      {/* ================= FULL-HEIGHT SIDEBAR ================= */}
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-64 flex-col bg-[#1A1A24] text-white md:flex animate-in fade-in duration-300">
+        
+        {/* BRANDING LOGO */}
+        <div className="flex h-24 shrink-0 items-center justify-center border-b border-white/5 px-6">
+          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-14 w-auto object-contain" />
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href="/mentor-dashboard" className="block px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700">
-            Mentee Roster
+
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto py-6 pl-4 pr-0 space-y-1.5">
+          <Link 
+            href="/mentor-dashboard?tab=dashboard" 
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
+          >
+            <span>Dashboard</span>
           </Link>
-          <Link href="/mentor-dashboard?tab=meetings" className="block px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700">
-            Meetings
+
+          <Link 
+            href="/mentor-dashboard?tab=roster" 
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
+          >
+            <span>My Mentees</span>
           </Link>
-          <Link href="/mentor-dashboard/approvals" className="flex items-center justify-between gap-3 px-4 py-2 rounded-lg font-medium bg-blue-50 text-blue-700">
+
+          <Link 
+            href="/mentor-dashboard?tab=meetings" 
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
+          >
+            <span>Meetings</span>
+          </Link>
+
+          <Link 
+            href="/mentor-dashboard/approvals" 
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0"
+          >
             <span>Pending Approvals</span>
             {pendingApprovalCount > 0 && (
-              <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-black leading-none text-white">
-                {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-900 text-white px-1.5 text-[10px] font-bold shadow-sm mr-2">
+                {pendingApprovalCount}
               </span>
             )}
+            {/* Top curve */}
+            <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+              <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+            </div>
+            {/* Bottom curve */}
+            <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+              <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+            </div>
           </Link>
-          <Link href="/mentor-dashboard?tab=notices" className="block px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-700">
-            Global Notices
+
+          <Link 
+            href="/mentor-dashboard?tab=notices" 
+            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
+          >
+            <span>Global Notices</span>
           </Link>
         </nav>
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+        
+        {/* USER PROFILE & LOGOUT */}
+        <div className="p-4 border-t border-white/5 bg-transparent">
            <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="w-9 h-9 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                {user.name.charAt(0).toUpperCase()}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white shadow-sm">
+                {user.name ? user.name.charAt(0).toUpperCase() : "M"}
               </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-bold text-slate-800 truncate">{user.name}</span>
-                <span className="text-xs text-slate-500 font-medium tracking-wide">Faculty Mentor</span>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold text-white">{user.name || "Faculty Member"}</span>
+                <span className="truncate text-xs text-slate-400 font-medium">Mentor Account</span>
               </div>
            </div>
-           <div className="px-1"><LogoutButton /></div>
+           <div className="px-1"><LogoutButton variant="sidebar-dark" /></div>
         </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="min-h-screen p-8 pt-24 md:ml-64">
+      <main className="min-h-screen p-6 lg:p-10 md:ml-64">
         <div className="max-w-4xl mx-auto">
           
           <div className="mb-8 flex items-start justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Review Queue</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Pending Approvals</h1>
-              <p className="mt-1 text-sm text-slate-500">Review academic uploads, achievements, logs, and meeting requests submitted by your mentees.</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950">Pending Approvals</h1>
             </div>
             <NotificationBell />
           </div>

@@ -156,10 +156,12 @@ export default function MeetingTableWrapper({ initialMeetings, profileId, isMent
               })()}
             </div>
 
-            <div className="mb-6 rounded-lg border border-slate-100 bg-slate-50 p-5">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Agenda / Discussion Summary</h3>
-              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{getMeetingDetails(selectedLog).agenda}</p>
-            </div>
+            {isMentor && (
+              <div className="mb-6 rounded-lg border border-slate-100 bg-slate-50 p-5">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Agenda / Discussion Summary</h3>
+                <p className="text-slate-750 whitespace-pre-wrap leading-relaxed">{getMeetingDetails(selectedLog).agenda}</p>
+              </div>
+            )}
 
             {isMentor && selectedLog.status === 'Pending' && (
               <div className="flex gap-3 mb-4">
