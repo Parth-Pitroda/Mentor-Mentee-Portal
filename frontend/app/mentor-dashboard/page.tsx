@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
+import { redirect } from "next/navigation";
 import { 
   getLatestNotices, 
   getMentorRoster, 
@@ -9,9 +10,9 @@ import {
   getAcademicRecordsForProfile, 
   getAchievementRecordsForProfile, 
   getPendingApprovals,
-  getMentorNote
+  getMentorNote,
+  getStudentDirectory
 } from "@/lib/actions/student.actions";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
@@ -22,6 +23,7 @@ import MentorRosterExplorer from "@/components/MentorRosterExplorer";
 import MentorRosterCards from "@/components/MentorRosterCards";
 import HeaderSearchBar from "@/components/HeaderSearchBar";
 import MentorNotesEditor from "@/components/MentorNotesEditor";
+import StudentDirectoryTable from "@/components/StudentDirectoryTable";
 import { getFileViewUrl } from "@/lib/files";
 import type { NoticeRecord } from "@/types";
 import { 
@@ -54,6 +56,11 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     getMentorScheduledMeetings(user.$id),
     getPendingApprovals(user.$id)
   ]);
+
+  let studentDirectory: any[] = [];
+  if (activeTab === "directory") {
+    studentDirectory = await getStudentDirectory();
+  }
   
   const pendingApprovalCount =
     pendingApprovals.meetings.length +
@@ -143,6 +150,9 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   } else if (activeTab === 'student-achievements' && selectedStudent) {
     pageTitle = "Achievements";
     pageDesc = `Achievement records submitted by ${selectedStudent.fullName}.`;
+  } else if (activeTab === 'directory') {
+    pageTitle = "Student Directory";
+    pageDesc = "View all students across the portal along with their assigned mentors and contact information.";
   }
 
   const isRosterActive = activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements';
@@ -216,6 +226,29 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
           >
             <span>Meetings</span>
             {activeTab === 'meetings' && (
+              <>
+                {/* Top curve */}
+                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
+                </div>
+                {/* Bottom curve */}
+                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
+                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
+                </div>
+              </>
+            )}
+          </Link>
+
+          <Link 
+            href="?tab=directory" 
+            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
+              activeTab === 'directory' 
+                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
+                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
+            }`}
+          >
+            <span>Student Directory</span>
+            {activeTab === 'directory' && (
               <>
                 {/* Top curve */}
                 <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
@@ -403,6 +436,13 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ================= TAB 8: STUDENT DIRECTORY ================= */}
+          {activeTab === 'directory' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both" style={{ animationDelay: "100ms" }}>
+              <StudentDirectoryTable students={studentDirectory} />
             </div>
           )}
 
