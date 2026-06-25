@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { respondToMeetingRequest } from "@/lib/actions/student.actions";
 import MentorMeetingScheduler from "./MentorMeetingScheduler";
 import MentorScheduledMeetings from "./MentorScheduledMeetings";
@@ -15,9 +15,19 @@ type MeetingsTabClientProps = {
 
 export default function MeetingsTabClient({ mentees, scheduledMeetings, meetingRequests }: MeetingsTabClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const meetingGroupId = searchParams.get("meetingGroupId");
+
   const [activeSubTab, setActiveSubTab] = useState<"logs" | "schedule" | "requests">(
-    meetingRequests && meetingRequests.length > 0 ? "requests" : "logs"
+    meetingGroupId ? "logs" : (meetingRequests && meetingRequests.length > 0 ? "requests" : "logs")
   );
+
+  useEffect(() => {
+    if (meetingGroupId) {
+      setActiveSubTab("logs");
+    }
+  }, [meetingGroupId]);
+
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
 
