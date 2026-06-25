@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateScheduledMeetingAttendance, updateMeetingCommonPoints, updateMeetingStudentNotes } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
-import { Calendar, MapPin, Video, Clock, Users, Download, ExternalLink, Check, FileText, Trash2, Plus, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Video, Clock, Users, Download, ExternalLink, Check, FileText, Trash2, Plus, Loader2, Search } from "lucide-react";
 
 type StudentNote = { problem: string; action: string };
 
@@ -375,9 +375,13 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
 
   // Per-student notes state
   const [notesMap, setNotesMap] = useState<Record<string, StudentNote[]>>({});
-  const [openNotesId, setOpenNotesId] = useState<string | null>(null);
   const [savingNotesId, setSavingNotesId] = useState<string | null>(null);
   const [notesMessage, setNotesMessage] = useState<Record<string, string>>({});
+
+  // Slide-over drawer and roster filter states
+  const [activeNotesMeetingId, setActiveNotesMeetingId] = useState<string | null>(null);
+  const [studentQuery, setStudentQuery] = useState("");
+  const [rosterFilter, setRosterFilter] = useState<"all" | "met" | "not-met" | "logs">("all");
 
   const groups = useMemo<MeetingGroup[]>(() => {
     const groupMap = new Map<string, MeetingGroup>();
@@ -573,180 +577,328 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
       </div>
 
       {/* Right Column: Group Detail Board */}
-      {selectedGroup && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {/* Section Header */}
-          <div className="border-b border-slate-100 p-6 space-y-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 leading-tight">{selectedGroup.topic}</h2>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs font-semibold text-slate-500">
-                  <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.date || "N/A"}</span>
-                  {selectedGroup.time && <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.time}</span>}
-                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.venue || selectedGroup.mode || "Offline"}</span>
+      {selectedGroup && (() => {
+        const filteredRecords = selectedGroup.records.filter((meeting) => {
+          const student = meeting.student;
+          const studentName = (student?.fullName || meeting.studentName || "Unknown Student").toLowerCase();
+          const rollNo = (student?.rollNo || meeting.studentId || "").toLowerCase();
+          const searchLower = studentQuery.toLowerCase().trim();
+          
+          const matchesSearch = studentName.includes(searchLower) || rollNo.includes(searchLower);
+          if (!matchesSearch) return false;
+          
+          const attended = meeting.status === "Verified";
+          const currentNotes = getNotesForMeeting(meeting.$id, meeting);
+          const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
+          
+          if (rosterFilter === "met") return attended;
+          if (rosterFilter === "not-met") return !attended;
+          if (rosterFilter === "logs") return noteCount > 0;
+          return true;
+        });
+
+        return (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm space-y-6">
+            
+            {/* Section Header & Clean Profile-style Information Table */}
+            <div className="p-6 border-b border-slate-100 space-y-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 leading-tight">{selectedGroup.topic}</h2>
+                  <p className="text-xs font-semibold text-slate-400 mt-1">Scheduled Mentorship Session Details</p>
+                </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void exportMeetingReportPdf(selectedGroup)}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98]"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    Export PDF
+                  </button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => void exportMeetingReportPdf(selectedGroup)}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98]"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  Export PDF
-                </button>
+
+              {/* Profile-style Dashed Row Metadata Layout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1">
+                <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-xs sm:text-sm">
+                  <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Session Date</span>
+                  <span className="text-slate-900 font-extrabold">{selectedGroup.date || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-xs sm:text-sm">
+                  <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Scheduled Time</span>
+                  <span className="text-slate-900 font-extrabold">{selectedGroup.time || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-xs sm:text-sm">
+                  <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Venue / Mode</span>
+                  <span className="text-slate-900 font-extrabold">{selectedGroup.venue || selectedGroup.mode || "Offline"}</span>
+                </div>
                 {selectedGroup.link && (
-                  <a
-                    href={selectedGroup.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 transition cursor-pointer active:scale-[0.98]"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Open Link
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <div className="border-l-4 border-slate-300 bg-slate-50/50 px-4.5 py-3 rounded-r-xl select-none">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">Meeting Agenda</span>
-              <p className="text-sm font-semibold leading-relaxed text-slate-650 whitespace-pre-wrap">
-                {selectedGroup.agenda || "No agenda provided."}
-              </p>
-            </div>
-
-            {/* Common Points Section */}
-            <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
-                  Common Points Related to All Students
-                </label>
-              </div>
-              <textarea
-                value={commonPointsText}
-                onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
-                rows={3}
-                placeholder="Enter common discussion points, observations, or notes that apply to all students in this meeting..."
-                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3.5 text-sm leading-relaxed text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-semibold placeholder:font-medium placeholder:text-slate-400 shadow-inner"
-              />
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleSaveCommonPoints()}
-                  disabled={savingCommonPoints}
-                  className="rounded-xl bg-blue-600 px-4.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] cursor-pointer disabled:opacity-60"
-                >
-                  {savingCommonPoints ? "Saving..." : "Save Common Points"}
-                </button>
-                {commonPointsMessage && (
-                  <span className={`text-xs font-bold ${commonPointsMessage === "Saved!" ? "text-green-600" : "text-red-600"}`}>
-                    {commonPointsMessage}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Student Roster Lists */}
-          <div className="divide-y divide-slate-100 bg-white">
-            {selectedGroup.records.map((meeting) => {
-              const student = meeting.student;
-              const studentName = student?.fullName || meeting.studentName || "Unknown Student";
-              const attended = meeting.status === "Verified";
-
-              const currentNotes = getNotesForMeeting(meeting.$id, meeting);
-              const isNotesOpen = openNotesId === meeting.$id;
-              const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
-
-              return (
-                <div key={meeting.$id} className="p-6 transition hover:bg-slate-50/20">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <Link
-                      href={`?tab=student-profile&id=${meeting.studentId}`}
-                      className="flex min-w-0 items-center gap-4 group"
+                  <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-xs sm:text-sm">
+                    <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Meeting Link</span>
+                    <a 
+                      href={selectedGroup.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-extrabold truncate max-w-[200px] flex items-center gap-1"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 shadow-sm group-hover:border-blue-200">
-                        {student?.profilePictureId ? (
-                          <img
-                            src={getFileViewUrl(student.profilePictureId)}
-                            alt={`${studentName} Profile`}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          />
-                        ) : (
-                          getInitials(studentName)
-                        )}
-                      </div>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="truncate font-extrabold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">{studentName}</p>
-                        <p className="truncate text-xs text-slate-455 font-semibold">{student?.email || "No email available"}</p>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {student?.rollNo && (
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.rollNo}</span>
-                          )}
-                          {student?.department && (
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.department}</span>
-                          )}
+                      <span>Link</span>
+                      <ExternalLink className="w-3 h-3 inline" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Meeting Agenda Card */}
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/20 p-5 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Meeting Agenda</span>
+                <p className="text-sm font-semibold leading-relaxed text-slate-650 whitespace-pre-wrap">
+                  {selectedGroup.agenda || "No agenda provided."}
+                </p>
+              </div>
+
+              {/* Common Points Section Card */}
+              <div className="rounded-xl border border-slate-200/80 bg-white p-5 space-y-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                    Common Discussion Points (All Students)
+                  </label>
+                </div>
+                <textarea
+                  value={commonPointsText}
+                  onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
+                  rows={3}
+                  placeholder="Enter common discussion points, observations, or notes that apply to all students in this meeting..."
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3.5 text-sm leading-relaxed text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-semibold placeholder:font-medium placeholder:text-slate-400 shadow-inner"
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveCommonPoints()}
+                    disabled={savingCommonPoints}
+                    className="rounded-xl bg-blue-600 px-4.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                  >
+                    {savingCommonPoints ? "Saving..." : "Save Common Points"}
+                  </button>
+                  {commonPointsMessage && (
+                    <span className={`text-[10px] font-extrabold tracking-wide uppercase px-2.5 py-1 rounded-full ${
+                      commonPointsMessage === "Saved!" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                    }`}>
+                      {commonPointsMessage}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Student Roster Header & Quick Filters */}
+            <div className="px-6 space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Student Attendance & Logs</h3>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Filter and manage student log dossiers</p>
+                </div>
+                
+                {/* Roster Search Input */}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all sm:w-[220px]">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    type="search"
+                    value={studentQuery}
+                    onChange={(e) => setStudentQuery(e.target.value)}
+                    placeholder="Search students..."
+                    className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400 w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Roster Quick Filters */}
+              <div className="flex flex-wrap gap-1.5 border-b border-slate-100 pb-3">
+                {[
+                  { id: "all", label: "All Students", count: selectedGroup.records.length },
+                  { id: "met", label: "Met", count: selectedGroup.records.filter(r => r.status === "Verified").length },
+                  { id: "not-met", label: "Not Met", count: selectedGroup.records.filter(r => r.status !== "Verified").length },
+                  { id: "logs", label: "With Logs", count: selectedGroup.records.filter(r => getNotesForMeeting(r.$id, r).filter(n => n.problem || n.action).length > 0).length }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setRosterFilter(tab.id as any)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer select-none ${
+                      rosterFilter === tab.id
+                        ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                        : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-300"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={`text-[9px] py-0.5 px-1.5 rounded-full font-extrabold ${
+                      rosterFilter === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-550 border border-slate-200"
+                    }`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Student Roster Lists */}
+            <div className="divide-y divide-slate-100 bg-white">
+              {filteredRecords.length === 0 ? (
+                <div className="p-16 text-center text-slate-550">
+                  <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-slate-700">No students match current filter</p>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">Try changing filters or searching another name.</p>
+                </div>
+              ) : (
+                filteredRecords.map((meeting) => {
+                  const student = meeting.student;
+                  const studentName = student?.fullName || meeting.studentName || "Unknown Student";
+                  const attended = meeting.status === "Verified";
+
+                  const currentNotes = getNotesForMeeting(meeting.$id, meeting);
+                  const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
+
+                  return (
+                    <div key={meeting.$id} className="p-6 transition hover:bg-slate-50/20">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <Link
+                          href={`?tab=student-profile&id=${meeting.studentId}`}
+                          className="flex min-w-0 items-center gap-4 group"
+                        >
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 shadow-sm group-hover:border-blue-200">
+                            {student?.profilePictureId ? (
+                              <img
+                                src={getFileViewUrl(student.profilePictureId)}
+                                alt={`${studentName} Profile`}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              />
+                            ) : (
+                              getInitials(studentName)
+                            )}
+                          </div>
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="truncate font-extrabold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">{studentName}</p>
+                            <p className="truncate text-xs text-slate-455 font-semibold">{student?.email || "No email available"}</p>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {student?.rollNo && (
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.rollNo}</span>
+                              )}
+                              {student?.department && (
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.department}</span>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                          <button
+                            type="button"
+                            disabled={updatingId === meeting.$id}
+                            onClick={() => void handleAttendance(meeting, !attended)}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 border cursor-pointer ${
+                              attended
+                                ? "bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100/70"
+                                : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
+                            }`}
+                          >
+                            {updatingId === meeting.$id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : attended ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                            )}
+                            {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveNotesMeetingId(meeting.$id)}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                              noteCount > 0
+                                ? "border-amber-200 bg-amber-50/50 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+                                : "border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:border-slate-355"
+                            }`}
+                          >
+                            <FileText className="w-4 h-4 shrink-0 text-slate-500" />
+                            Action Dossier{noteCount > 0 ? ` (${noteCount})` : ""}
+                          </button>
                         </div>
                       </div>
-                    </Link>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {/* Slide-Over Drawer for Action Dossier */}
+            {activeNotesMeetingId && (() => {
+              const meeting = selectedGroup.records.find((m) => m.$id === activeNotesMeetingId);
+              if (!meeting) return null;
+              const student = meeting.student;
+              const studentName = student?.fullName || meeting.studentName || "Unknown Student";
+              const currentNotes = getNotesForMeeting(meeting.$id, meeting);
+              
+              return (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+                    onClick={() => setActiveNotesMeetingId(null)}
+                  />
+                  
+                  {/* Drawer panel */}
+                  <div className="relative w-full sm:w-[500px] h-full bg-white shadow-2xl z-10 flex flex-col animate-in slide-in-from-right duration-350 ease-out border-l border-slate-200">
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4.5 bg-slate-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-150 bg-white shadow-sm font-bold text-slate-700">
+                          {student?.profilePictureId ? (
+                            <img
+                              src={getFileViewUrl(student.profilePictureId)}
+                              alt={`${studentName} Profile`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            getInitials(studentName)
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-slate-900 leading-none">{studentName}</h3>
+                          <p className="text-[10px] text-slate-455 font-bold uppercase tracking-wider mt-1">Action Dossier & Logs</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        disabled={updatingId === meeting.$id}
-                        onClick={() => void handleAttendance(meeting, !attended)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 border cursor-pointer ${
-                          attended
-                            ? "bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100/70"
-                            : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
-                        }`}
+                        onClick={() => setActiveNotesMeetingId(null)}
+                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition cursor-pointer shadow-sm active:scale-[0.98]"
                       >
-                        {updatingId === meeting.$id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : attended ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                        )}
-                        {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setOpenNotesId(isNotesOpen ? null : meeting.$id)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                          isNotesOpen
-                            ? "border-amber-300 bg-amber-50 text-amber-800"
-                            : noteCount > 0
-                              ? "border-amber-200 bg-amber-50/50 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
-                              : "border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:border-slate-355"
-                        }`}
-                      >
-                        <FileText className="w-4 h-4 shrink-0 text-slate-500" />
-                        Action Dossier{noteCount > 0 ? ` (${noteCount})` : ""}
+                        Close
                       </button>
                     </div>
-                  </div>
-
-                  {/* Student Notes Inline Editor */}
-                  {isNotesOpen && (
-                    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/15 p-5 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                    
+                    {/* Drawer Body (Scrollable) */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
                       <div className="flex items-center gap-2">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                         <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Student Incident Logs & Feedback</p>
                       </div>
                       
                       {currentNotes.length === 0 && (
-                        <p className="text-xs font-semibold text-slate-450 italic py-1">No individual student logs entered for this meeting slot. Click "Add Problem" to record feedback.</p>
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+                          <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs font-semibold text-slate-450 italic">No logs entered for this student in this session.</p>
+                          <p className="text-[10px] text-slate-400 mt-1 font-semibold">Click the button below to add your first incident log.</p>
+                        </div>
                       )}
 
                       <div className="space-y-4">
                         {currentNotes.map((note, noteIndex) => (
-                          <div key={noteIndex} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm relative space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                              <span className="text-xs font-extrabold text-slate-500">Record #{noteIndex + 1}</span>
+                          <div key={noteIndex} className="rounded-xl border border-slate-200 bg-slate-50/20 p-4 shadow-sm relative space-y-3.5">
+                            <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+                              <span className="text-xs font-extrabold text-slate-550">Record #{noteIndex + 1}</span>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveNote(meeting.$id, noteIndex, meeting)}
@@ -758,44 +910,56 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
                             </div>
                             <div className="space-y-3">
                               <div className="space-y-1">
-                                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Observed Issue / Problem Faced</label>
+                                <label className="text-[9px] font-extrabold text-slate-455 uppercase tracking-wider block">Observed Issue / Problem Faced</label>
                                 <textarea
                                   value={note.problem}
                                   onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "problem", e.target.value, meeting)}
                                   rows={2}
-                                  placeholder="Describe any academic, logistical, or personal challenges..."
-                                  className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-xs font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
+                                  placeholder="Describe academic, logistical, or personal challenges..."
+                                  className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Action Taken / Proposed Solution</label>
+                                <label className="text-[9px] font-extrabold text-slate-455 uppercase tracking-wider block">Action Taken / Proposed Solution</label>
                                 <textarea
                                   value={note.action}
                                   onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "action", e.target.value, meeting)}
                                   rows={2}
                                   placeholder="Describe the solution, guidance, or next steps suggested..."
-                                  className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-xs font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
+                                  className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
                                 />
                               </div>
                             </div>
                           </div>
                         ))}
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleAddNote(meeting.$id, meeting)}
-                          className="flex items-center gap-1.5 rounded-xl border border-dashed border-slate-350 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-650 transition cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Add Incident Note
-                        </button>
+                    </div>
+                    
+                    {/* Drawer Footer (Pinned) */}
+                    <div className="border-t border-slate-150 p-6 bg-slate-50/50 flex items-center justify-between gap-3 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleAddNote(meeting.$id, meeting)}
+                        className="flex items-center gap-1.5 rounded-xl border border-dashed border-slate-350 bg-white hover:bg-slate-50 px-4.5 py-2.5 text-xs font-bold text-slate-655 transition cursor-pointer shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Note
+                      </button>
+                      
+                      <div className="flex items-center gap-3">
+                        {notesMessage[meeting.$id] && (
+                          <span className={`text-[10px] font-extrabold tracking-wide uppercase px-2.5 py-1 rounded-full ${
+                            notesMessage[meeting.$id] === "Saved!" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                          }`}>
+                            {notesMessage[meeting.$id]}
+                          </span>
+                        )}
+                        
                         <button
                           type="button"
                           onClick={() => void handleSaveNotes(meeting.$id, meeting)}
                           disabled={savingNotesId === meeting.$id}
-                          className="flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer disabled:opacity-60"
+                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:opacity-60 px-5 py-2.5 text-xs font-bold text-white shadow-md transition cursor-pointer"
                         >
                           {savingNotesId === meeting.$id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -804,22 +968,16 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
                           )}
                           Save Logs
                         </button>
-                        {notesMessage[meeting.$id] && (
-                          <span className={`text-xs font-extrabold tracking-wide uppercase px-2.5 py-1 rounded-full ${
-                            notesMessage[meeting.$id] === "Saved!" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                          }`}>
-                            {notesMessage[meeting.$id]}
-                          </span>
-                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
-            })}
+            })()}
+
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
