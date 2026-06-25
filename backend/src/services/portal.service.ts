@@ -208,6 +208,58 @@ export class PortalService {
     return asJson(students.documents);
   }
 
+  static async getStudentDirectory(_payload: unknown, ctx: PortalContext) {
+    requireRole(ctx, ["admin", "coordinator", "mentor"]);
+    const db = adminDatabases();
+
+    // 1. Fetch all mentors (limit 500)
+    const mentorsRes = await db.listDocuments(databaseId(), profilesId(), [
+      Query.equal("role", ["mentor"]),
+      Query.limit(500)
+    ]);
+    const mentorsMap = new Map<string, any>();
+    for (const mentor of mentorsRes.documents) {
+      mentorsMap.set(mentor.$id, mentor);
+    }
+
+    // 2. Fetch all mentees (role === "mentee"), paginated up to 500
+    let mentees: any[] = [];
+    let offset = 0;
+    const batchSize = 100;
+    while (mentees.length < 500) {
+      const menteesRes = await db.listDocuments(databaseId(), profilesId(), [
+        Query.equal("role", ["mentee"]),
+        Query.orderDesc("$createdAt"),
+        Query.limit(batchSize),
+        Query.offset(offset)
+      ]);
+      if (menteesRes.documents.length === 0) break;
+      mentees.push(...menteesRes.documents);
+      if (menteesRes.documents.length < batchSize) break;
+      offset += batchSize;
+    }
+
+    // 3. Enrich each student with their mentor's info
+    const enrichedStudents = mentees.map(student => {
+      const mentor = student.mentorId ? mentorsMap.get(student.mentorId) : null;
+      return {
+        $id: student.$id,
+        fullName: student.fullName || "",
+        email: student.email || "",
+        phone: student.phone || "",
+        rollNo: student.rollNo || "",
+        department: student.department || "",
+        semester: student.semester || "",
+        mentorId: student.mentorId || "",
+        mentorName: mentor ? (mentor.fullName || "Unassigned") : "Unassigned",
+        mentorEmail: mentor ? (mentor.email || "") : "",
+        mentorPhone: mentor ? (mentor.phone || "") : "",
+      };
+    });
+
+    return asJson(enrichedStudents);
+  }
+
   static async getAchievements({ studentId }: { studentId: string }, ctx: PortalContext) {
     await requireSelfOrAssignedMentor(ctx, studentId);
     const result = await adminDatabases().listDocuments(databaseId(), achievementsId(), [Query.equal("studentId", [studentId]), Query.orderDesc("$createdAt")]);

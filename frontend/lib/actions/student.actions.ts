@@ -88,6 +88,15 @@ export async function getAllStudents() {
   }
 }
 
+export async function getStudentDirectory() {
+  try {
+    return await portalAction("getStudentDirectory");
+  } catch (error) {
+    console.error("Failed to fetch student directory:", error);
+    return [];
+  }
+}
+
 export async function getAchievements(studentId: string) {
   try {
     return await portalAction("getAchievements", { studentId });
