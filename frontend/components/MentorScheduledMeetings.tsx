@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { updateScheduledMeetingAttendance, updateMeetingCommonPoints, updateMeetingStudentNotes } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
 import { Calendar, MapPin, Video, Clock, Users, Download, ExternalLink, Check, FileText, Trash2, Plus, Loader2, Search, ChevronRight, ChevronLeft, AlertCircle } from "lucide-react";
@@ -58,7 +58,34 @@ function parseMeetingDetails(meeting: ScheduledMeeting) {
   const link = meeting.meetingLink || lines.find((line) => line.startsWith("Link:"))?.replace("Link:", "").trim() || "";
   const venue = lines.find((line) => line.startsWith("Venue:"))?.replace("Venue:", "").trim() || link || mode || "Not specified";
   const agendaIndex = lines.findIndex((line) => line.trim() === "Agenda:");
-  const agenda = meeting.agenda || (agendaIndex >= 0 ? lines.slice(agendaIndex + 1).join("\n").trim() : description);
+  
+  let agenda = meeting.agenda || (agendaIndex >= 0 ? lines.slice(agendaIndex + 1).join("\n").trim() : description);
+
+  // Clean agenda by removing markers
+  const cpMarker = "---COMMON_POINTS---";
+  const snMarker = "---STUDENT_NOTES---";
+  if (agenda.includes(cpMarker)) {
+    agenda = agenda.split(cpMarker)[0].trim();
+  }
+  if (agenda.includes(snMarker)) {
+    agenda = agenda.split(snMarker)[0].trim();
+  }
+
+  // If the agenda still starts with the scheduled meeting marker and meta info, clean it up
+  if (agenda.includes("[Mentor Scheduled Meeting]")) {
+    const cleanLines = agenda.split("\n").filter(line => {
+      const trimmed = line.trim();
+      return (
+        trimmed !== "[Mentor Scheduled Meeting]" &&
+        !trimmed.startsWith("Time:") &&
+        !trimmed.startsWith("Mode:") &&
+        !trimmed.startsWith("Venue:") &&
+        !trimmed.startsWith("Link:") &&
+        trimmed !== "Agenda:"
+      );
+    });
+    agenda = cleanLines.join("\n").trim();
+  }
 
   return { time, mode, link, venue, agenda };
 }
@@ -367,6 +394,9 @@ async function exportMeetingReportPdf(group: MeetingGroup) {
 
 export default function MentorScheduledMeetings({ meetings }: { meetings: ScheduledMeeting[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [commonPointsText, setCommonPointsText] = useState<string>("");
   const [savingCommonPoints, setSavingCommonPoints] = useState(false);
@@ -382,8 +412,8 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
   const [studentQuery, setStudentQuery] = useState("");
   const [rosterFilter, setRosterFilter] = useState<"all" | "met" | "not-met" | "logs">("all");
   
-  // Meetings Hub search query state
-  const [meetingSearchQuery, setMeetingSearchQuery] = useState("");
+  // Read Meetings Hub search query directly from q query parameter
+  const meetingSearchQuery = searchParams.get("q") || "";
 
   const groups = useMemo<MeetingGroup[]>(() => {
     const groupMap = new Map<string, MeetingGroup>();
@@ -424,14 +454,12 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
           records: [],
         });
       }
-
       groupMap.get(key)?.records.push(meeting);
     });
 
     return Array.from(groupMap.values()).sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
   }, [meetings]);
 
-  const searchParams = useSearchParams();
   const urlGroupId = searchParams.get("meetingGroupId");
   const selectedGroup = groups.find((group) => group.key === urlGroupId) || null;
 
@@ -522,18 +550,6 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
     );
   }
 
-  // --- Calculate Hub Statistics ---
-  const totalSessions = groups.length;
-  const totalMenteesCount = groups.reduce((acc, g: MeetingGroup) => acc + g.records.length, 0);
-  const totalAttendedCount = groups.reduce((acc, g: MeetingGroup) => acc + g.records.filter((r: ScheduledMeeting) => r.status === "Verified").length, 0);
-  const avgAttendanceRate = totalMenteesCount > 0 ? Math.round((totalAttendedCount / totalMenteesCount) * 100) : 0;
-  const totalIncidentLogs = groups.reduce((acc, g: MeetingGroup) => {
-    return acc + g.records.reduce((sum, r: ScheduledMeeting) => {
-      const notes = parseStudentNotes(r);
-      return sum + notes.filter(n => n.problem || n.action).length;
-    }, 0);
-  }, 0);
-
   // --- Filter Groups for the Hub ---
   const filteredGroups = useMemo<MeetingGroup[]>(() => {
     const q = meetingSearchQuery.toLowerCase().trim();
@@ -546,67 +562,9 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
 
   // Master Detail conditional rendering
   if (!selectedGroup) {
-    // LAYOUT A: Meetings List Hub (Master view)
+    // LAYOUT A: Meetings List Hub (Master view) - Table format
     return (
       <div className="space-y-6 select-none animate-in fade-in duration-300">
-        
-        {/* Hub Header & Stats Deck */}
-        <div className="grid gap-6 sm:grid-cols-3">
-          {/* Stat 1: Total Meetings */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 cursor-default select-none">
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Sessions</p>
-              <h3 className="mt-1 text-3xl font-black text-slate-900">{totalSessions}</h3>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 border border-blue-100 shrink-0">
-              <Calendar className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Stat 2: Avg Attendance */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 cursor-default select-none">
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Avg Attendance</p>
-              <h3 className="mt-1 text-3xl font-black text-slate-900">{avgAttendanceRate}%</h3>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Stat 3: Total Logs */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 cursor-default select-none">
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Incident Dossiers</p>
-              <h3 className="mt-1 text-3xl font-black text-slate-900">{totalIncidentLogs}</h3>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
-              <AlertCircle className="h-5 w-5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Filter / Search section */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <div>
-            <h2 className="text-base font-extrabold text-slate-900">Scheduled Sessions History</h2>
-            <p className="text-xs font-semibold text-slate-400 mt-0.5">Select a meeting below to manage student attendance, notes, and log dossiers.</p>
-          </div>
-
-          {/* Search bar */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all sm:w-[260px]">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="search"
-              value={meetingSearchQuery}
-              onChange={(e) => setMeetingSearchQuery(e.target.value)}
-              placeholder="Search meetings by topic or date..."
-              className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400 w-full"
-            />
-          </div>
-        </div>
-
-        {/* Cards Grid */}
         {filteredGroups.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-16 text-center select-none shadow-sm max-w-xl mx-auto my-8 animate-in fade-in duration-300">
             <Search className="w-10 h-10 text-slate-350 mx-auto mb-3" />
@@ -614,80 +572,94 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
             <p className="text-xs font-semibold text-slate-400 mt-1">Try resetting search filter or checking spelling.</p>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredGroups.map((group: MeetingGroup) => {
-              const attendedCount = group.records.filter((record: ScheduledMeeting) => record.status === "Verified").length;
-              const totalRecords = group.records.length;
-              const attendancePercent = totalRecords > 0 ? Math.round((attendedCount / totalRecords) * 100) : 0;
-              const isOnline = group.mode?.toUpperCase() === "ONLINE";
-              
-              return (
-                <div 
-                  key={group.key}
-                  className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 flex flex-col justify-between gap-5 relative group"
-                >
-                  <div className="space-y-3.5">
-                    <div className="flex justify-between items-start gap-3">
-                      <h3 className="font-extrabold text-slate-900 text-sm leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
-                        {group.topic}
-                      </h3>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider shrink-0 ${
-                        isOnline 
-                          ? "bg-indigo-50 border-indigo-150 text-indigo-700" 
-                          : "bg-slate-50 border-slate-200 text-slate-650"
-                      }`}>
-                        {group.mode || "Offline"}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-y-2 text-xs font-semibold text-slate-500 border-t border-slate-100 pt-3 select-none">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span>{group.date || "Pending Date"}</span>
-                      </div>
-                      {group.time && (
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>{group.time}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1.5 col-span-2">
-                        <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="truncate">{group.venue || group.mode || "Offline"}</span>
-                      </div>
-                    </div>
-                  </div>
+          <div className="overflow-x-auto select-none bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50">
+                  <th className="py-4 px-6 font-extrabold">Meeting Topic</th>
+                  <th className="py-4 px-6 font-extrabold">Date & Time</th>
+                  <th className="py-4 px-6 font-extrabold">Venue / Mode</th>
+                  <th className="py-4 px-6 font-extrabold">Attendance</th>
+                  <th className="py-4 px-6 font-extrabold text-right"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredGroups.map((group: MeetingGroup) => {
+                  const attendedCount = group.records.filter((record: ScheduledMeeting) => record.status === "Verified").length;
+                  const totalRecords = group.records.length;
+                  const attendancePercent = totalRecords > 0 ? Math.round((attendedCount / totalRecords) * 100) : 0;
+                  const isOnline = group.mode?.toUpperCase() === "ONLINE";
 
-                  {/* Attendance completion stats bar */}
-                  <div className="space-y-1.5 select-none">
-                    <div className="flex justify-between text-xs font-bold text-slate-600">
-                      <span>Attendance</span>
-                      <span>{attendedCount} / {totalRecords} ({attendancePercent}%)</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 border border-slate-150 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${attendancePercent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3.5 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => router.push(`?tab=meetings&meetingGroupId=${group.key}`)}
-                      className="flex items-center gap-1 px-4 py-2 bg-slate-900 hover:bg-slate-800 hover:scale-[1.02] active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer shadow-sm"
+                  return (
+                    <tr
+                      key={group.key}
+                      onClick={() => router.push(`${pathname}?tab=meetings&meetingGroupId=${group.key}`)}
+                      className="group/row hover:bg-slate-50/50 transition-colors text-sm text-slate-655 cursor-pointer animate-in fade-in duration-200"
                     >
-                      <span>View Details</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                      <td className="py-4 px-6">
+                        <p className="font-bold text-slate-900 leading-tight hover:text-blue-700 transition-colors">
+                          {group.topic}
+                        </p>
+                        {group.records[0]?.agenda && (
+                          <p className="text-xs text-slate-400 mt-1 truncate max-w-xs md:max-w-md">
+                            {group.records[0].agenda}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 font-semibold text-slate-700">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{group.date || "Pending Date"}</span>
+                          </div>
+                          {group.time && (
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{group.time}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider ${
+                            isOnline
+                              ? "bg-indigo-50 border-indigo-150 text-indigo-700"
+                              : "bg-slate-50 border-slate-200 text-slate-655"
+                          }`}>
+                            {group.mode || "Offline"}
+                          </span>
+                          <span className="text-xs text-slate-450 truncate max-w-[150px] mt-0.5">
+                            {group.venue || group.mode || "Offline"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col gap-1 w-28">
+                          <div className="flex justify-between text-xs font-bold text-slate-600">
+                            <span>{attendedCount} / {totalRecords}</span>
+                            <span>{attendancePercent}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                              style={{ width: `${attendancePercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 group-hover/row:text-slate-800 group-hover/row:border-slate-350 hover:bg-slate-50 transition-all duration-200 shadow-sm ml-auto">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-
       </div>
     );
   }
@@ -715,167 +687,149 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
   return (
     <div className="space-y-6 select-none animate-in fade-in duration-300">
       
-      {/* Top Back Action Row */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-4 select-none">
-        <button
-          type="button"
-          onClick={() => router.push("?tab=meetings")}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98] self-start"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Back to scheduled sessions</span>
-        </button>
-        
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void exportMeetingReportPdf(selectedGroup)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98]"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            Export PDF
-          </button>
-        </div>
-      </div>
-
-      {/* Main Two-Column Master Detail Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+      {/* Main Stacking Master Detail Layout */}
+      <div className="space-y-8">
         
         {/* Left Column: Meeting Metadata Info & Common Points */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 leading-tight">{selectedGroup.topic}</h2>
-              <p className="text-xs font-semibold text-slate-400 mt-1">Scheduled Mentorship Session Details</p>
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 leading-tight">{selectedGroup.topic}</h2>
+                <p className="text-xs text-slate-450 mt-0.5">Scheduled Mentorship Session Details</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void exportMeetingReportPdf(selectedGroup)}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98] shrink-0"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Export Report</span>
+              </button>
             </div>
 
-            {/* Profile-style Dashed Row Metadata Layout */}
-            <div className="grid grid-cols-1 gap-y-1">
-              <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-sm">
-                <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Session Date</span>
-                <span className="text-slate-900 font-extrabold">{selectedGroup.date || "N/A"}</span>
+            {/* Clean Horizontal Metadata Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Date</span>
+                <p className="font-bold text-slate-850">{selectedGroup.date || "N/A"}</p>
               </div>
-              <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-sm">
-                <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Scheduled Time</span>
-                <span className="text-slate-900 font-extrabold">{selectedGroup.time || "N/A"}</span>
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Time</span>
+                <p className="font-bold text-slate-855">{selectedGroup.time || "N/A"}</p>
               </div>
-              <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-sm">
-                <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Venue / Mode</span>
-                <span className="text-slate-900 font-extrabold">{selectedGroup.venue || selectedGroup.mode || "Offline"}</span>
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Venue / Mode</span>
+                <span className="font-bold text-slate-850 truncate block">{selectedGroup.venue || selectedGroup.mode || "Offline"}</span>
               </div>
-              {selectedGroup.link && (
-                <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200/80 text-sm">
-                  <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Meeting Link</span>
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Meeting Link</span>
+                {selectedGroup.link ? (
                   <a 
                     href={selectedGroup.link} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-extrabold truncate max-w-[200px] flex items-center gap-1"
+                    className="text-blue-650 hover:text-blue-850 hover:underline font-bold truncate block flex items-center gap-1"
                   >
-                    <span>Link</span>
-                    <ExternalLink className="w-3 h-3 inline" />
+                    <span>Join Session</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </a>
-                </div>
-              )}
-            </div>
-
-            {/* Meeting Agenda Card */}
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50/20 p-5 space-y-2 select-none">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Meeting Agenda</span>
-              <p className="text-sm font-semibold leading-relaxed text-slate-650 whitespace-pre-wrap">
-                {selectedGroup.agenda || "No agenda provided."}
-              </p>
-            </div>
-
-            {/* Common Points Section Card */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-5 space-y-3.5">
-              <div className="flex items-center gap-2 select-none">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
-                  Common Discussion Points (All Students)
-                </label>
+                ) : (
+                  <p className="font-semibold text-slate-400">In-Person</p>
+                )}
               </div>
-              <textarea
-                value={commonPointsText}
-                onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
-                rows={4}
-                placeholder="Enter common discussion points, observations, or notes that apply to all students in this meeting..."
-                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3.5 text-sm leading-relaxed text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-semibold placeholder:font-medium placeholder:text-slate-400 shadow-inner"
-              />
-              <div className="flex items-center gap-3">
+            </div>
+
+            {/* Agenda & Discussion Points Side-by-Side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+              {/* Agenda Card */}
+              <div className="rounded-xl border border-slate-150 bg-slate-50/30 p-5 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Meeting Agenda</span>
+                <p className="text-xs font-semibold leading-relaxed text-slate-655 whitespace-pre-wrap">
+                  {selectedGroup.agenda || "No agenda provided."}
+                </p>
+              </div>
+
+              {/* Common Points Card */}
+              <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 font-extrabold">Common Discussion Points</span>
+                  {commonPointsMessage && (
+                    <span className="text-[9px] font-bold text-green-600 uppercase tracking-wider">
+                      {commonPointsMessage}
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={commonPointsText}
+                  onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
+                  rows={3}
+                  placeholder="Enter comments for all students..."
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700 outline-none transition focus:border-blue-500 font-semibold placeholder:font-medium placeholder:text-slate-400 shadow-inner"
+                />
                 <button
                   type="button"
                   onClick={() => void handleSaveCommonPoints()}
                   disabled={savingCommonPoints}
-                  className="rounded-xl bg-blue-600 px-4.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] cursor-pointer disabled:opacity-60"
                 >
-                  {savingCommonPoints ? "Saving..." : "Save Common Points"}
+                  {savingCommonPoints ? "Saving..." : "Save Points"}
                 </button>
-                {commonPointsMessage && (
-                  <span className={`text-[10px] font-extrabold tracking-wide uppercase px-2.5 py-1 rounded-full ${
-                    commonPointsMessage === "Saved!" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                  }`}>
-                    {commonPointsMessage}
-                  </span>
-                )}
               </div>
             </div>
           </div>
         </div>
 
         {/* Right Column: Student Roster List & Attendance Tracker */}
-        <div className="lg:col-span-3 space-y-6 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden p-6">
+        <div className="space-y-6 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden p-6">
           <div className="space-y-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Student Attendance & Logs</h3>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">Filter and manage student log dossiers</p>
+                <p className="text-xs text-slate-450 mt-0.5">Manage student attendance status and log entries</p>
               </div>
               
-              {/* Roster Search Input */}
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all sm:w-[220px]">
-                <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                <input
-                  type="search"
-                  value={studentQuery}
-                  onChange={(e) => setStudentQuery(e.target.value)}
-                  placeholder="Search students..."
-                  className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400 w-full"
-                />
-              </div>
-            </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Roster Quick Filters (Segmented Pill Style) */}
+                <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 select-none">
+                  {[
+                    { id: "all", label: "All", count: selectedGroup.records.length },
+                    { id: "met", label: "Present", count: selectedGroup.records.filter(r => r.status === "Verified").length },
+                    { id: "not-met", label: "Absent", count: selectedGroup.records.filter(r => r.status !== "Verified").length },
+                    { id: "logs", label: "Logs", count: selectedGroup.records.filter(r => getNotesForMeeting(r.$id, r).filter(n => n.problem || n.action).length > 0).length }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setRosterFilter(tab.id as any)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
+                        rosterFilter === tab.id
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
 
-            {/* Roster Quick Filters */}
-            <div className="flex flex-wrap gap-1.5 border-b border-slate-100 pb-3 select-none">
-              {[
-                { id: "all", label: "All Students", count: selectedGroup.records.length },
-                { id: "met", label: "Met", count: selectedGroup.records.filter(r => r.status === "Verified").length },
-                { id: "not-met", label: "Not Met", count: selectedGroup.records.filter(r => r.status !== "Verified").length },
-                { id: "logs", label: "With Logs", count: selectedGroup.records.filter(r => getNotesForMeeting(r.$id, r).filter(n => n.problem || n.action).length > 0).length }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setRosterFilter(tab.id as any)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer select-none ${
-                    rosterFilter === tab.id
-                      ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                      : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-355"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`text-[9px] py-0.5 px-1.5 rounded-full font-extrabold ${
-                    rosterFilter === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-550 border border-slate-200"
-                  }`}>
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
+                {/* Roster Search Input */}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus-within:border-blue-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all sm:w-[180px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <input
+                    type="search"
+                    value={studentQuery}
+                    onChange={(e) => setStudentQuery(e.target.value)}
+                    placeholder="Search name..."
+                    className="bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400 w-full"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Student List */}
-          <div className="divide-y divide-slate-150">
+          {/* Student List Table */}
+          <div className="overflow-x-auto select-none">
             {filteredRecords.length === 0 ? (
               <div className="p-16 text-center text-slate-550 select-none">
                 <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -883,83 +837,96 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
                 <p className="text-xs text-slate-400 mt-1 font-semibold">Try changing filters or searching another name.</p>
               </div>
             ) : (
-              filteredRecords.map((meeting) => {
-                const student = meeting.student;
-                const studentName = student?.fullName || meeting.studentName || "Unknown Student";
-                const attended = meeting.status === "Verified";
-                const currentNotes = getNotesForMeeting(meeting.$id, meeting);
-                const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50">
+                    <th className="py-3 px-4 font-extrabold">Student Info</th>
+                    <th className="py-3 px-4 font-extrabold">Course / Sem</th>
+                    <th className="py-3 px-4 font-extrabold">Attendance</th>
+                    <th className="py-3 px-4 font-extrabold text-right">Action Dossier</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRecords.map((meeting) => {
+                    const student = meeting.student;
+                    const studentName = student?.fullName || meeting.studentName || "Unknown Student";
+                    const attended = meeting.status === "Verified";
+                    const currentNotes = getNotesForMeeting(meeting.$id, meeting);
+                    const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
 
-                return (
-                  <div key={meeting.$id} className="py-4.5 transition hover:bg-slate-50/20">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <Link
-                        href={`?tab=student-profile&id=${meeting.studentId}`}
-                        className="flex min-w-0 items-center gap-4 group"
+                    return (
+                      <tr 
+                        key={meeting.$id} 
+                        className="hover:bg-slate-50/50 transition-colors text-sm text-slate-655"
                       >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 shadow-sm group-hover:border-blue-200">
-                          {student?.profilePictureId ? (
-                            <img
-                              src={getFileViewUrl(student.profilePictureId)}
-                              alt={`${studentName} Profile`}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
-                          ) : (
-                            getInitials(studentName)
-                          )}
-                        </div>
-                        <div className="min-w-0 space-y-0.5">
-                          <p className="truncate font-extrabold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">{studentName}</p>
-                          <p className="truncate text-xs text-slate-455 font-semibold">{student?.email || "No email available"}</p>
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {student?.rollNo && (
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.rollNo}</span>
+                        <td className="py-3 px-4">
+                          <Link
+                            href={`?tab=student-profile&id=${meeting.studentId}`}
+                            className="flex items-center gap-3 group"
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center font-bold text-slate-755 overflow-hidden shrink-0 shadow-sm group-hover:border-blue-200">
+                              {student?.profilePictureId ? (
+                                <img
+                                  src={getFileViewUrl(student.profilePictureId)}
+                                  alt={`${studentName} Profile`}
+                                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                />
+                              ) : (
+                                getInitials(studentName)
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 leading-tight group-hover:text-blue-700 transition-colors truncate max-w-[180px]">{studentName}</p>
+                              <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[180px] font-semibold">
+                                {student?.rollNo || "N/A"} • {student?.email || "No email"}
+                              </p>
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="font-semibold text-slate-800 truncate max-w-[160px]">{student?.department || "N/A"}</p>
+                          <p className="text-xs text-slate-455 mt-0.5">Sem {student?.semester || "N/A"}</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            disabled={updatingId === meeting.$id}
+                            onClick={() => void handleAttendance(meeting, !attended)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+                              attended
+                                ? "bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100/50"
+                                : "bg-white border-slate-200 text-slate-655 hover:bg-slate-50 hover:border-slate-355"
+                            }`}
+                          >
+                            {updatingId === meeting.$id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : attended ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-slate-300" />
                             )}
-                            {student?.department && (
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.department}</span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                        <button
-                          type="button"
-                          disabled={updatingId === meeting.$id}
-                          onClick={() => void handleAttendance(meeting, !attended)}
-                          className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 border cursor-pointer select-none ${
-                            attended
-                              ? "bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100/70"
-                              : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
-                          }`}
-                        >
-                          {updatingId === meeting.$id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : attended ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                          )}
-                          {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveNotesMeetingId(meeting.$id)}
-                          className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer select-none ${
-                            noteCount > 0
-                              ? "border-amber-200 bg-amber-50/50 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
-                              : "border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:border-slate-355"
-                          }`}
-                        >
-                          <FileText className="w-4 h-4 shrink-0 text-slate-500" />
-                          Action Dossier{noteCount > 0 ? ` (${noteCount})` : ""}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                            <span>{updatingId === meeting.$id ? "Updating..." : attended ? "Present" : "Mark Present"}</span>
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setActiveNotesMeetingId(meeting.$id)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer select-none ${
+                              noteCount > 0
+                                ? "border-amber-250 bg-amber-50/50 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+                                : "border-slate-200 bg-white text-slate-655 hover:bg-slate-50 hover:border-slate-355"
+                            }`}
+                          >
+                            <FileText className="w-3.5 h-3.5 shrink-0 text-slate-505" />
+                            <span>Logs{noteCount > 0 ? ` (${noteCount})` : ""}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         </div>

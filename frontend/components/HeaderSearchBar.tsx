@@ -23,6 +23,7 @@ export default function HeaderSearchBar() {
   };
 
   const currentValue = searchParams.get("q") || "";
+  const isMeetingsTab = searchParams.get("tab") === "meetings";
 
   return (
     <div className="relative max-w-xs w-full flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm shadow-sm animate-in fade-in duration-300">
@@ -31,7 +32,7 @@ export default function HeaderSearchBar() {
         type="search"
         defaultValue={currentValue}
         onChange={(e) => handleSearch(e.target.value)}
-        placeholder="Search mentees..."
+        placeholder={isMeetingsTab ? "Search meetings..." : "Search mentees..."}
         className="bg-transparent border-none outline-none w-full text-xs font-semibold placeholder:text-slate-400 text-slate-700"
       />
     </div>
