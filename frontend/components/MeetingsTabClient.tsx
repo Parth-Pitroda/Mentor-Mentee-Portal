@@ -40,20 +40,23 @@ export default function MeetingsTabClient({ mentees, scheduledMeetings, meetingR
   return (
     <div className="space-y-6 select-none animate-in fade-in duration-300">
       
-      {/* Premium Glassmorphic Sub-Navigation Tabs */}
-      <div className="flex w-full flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm sm:w-fit">
+      {/* Clean Tab Bar with Underline Only on Active Tab Text */}
+      <div className="flex w-full gap-8 pb-2 overflow-x-auto scrollbar-hide select-none">
         <button
           onClick={() => setActiveSubTab("logs")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 cursor-pointer ${
+          className={`flex items-center gap-2 py-2 text-sm font-bold transition-all duration-200 cursor-pointer ${
             activeSubTab === "logs"
-              ? "bg-white text-slate-900 shadow-sm border border-slate-200/50"
-              : "text-slate-505 hover:text-slate-800 hover:bg-white/30"
+              ? "text-blue-600"
+              : "text-slate-450 hover:text-slate-750"
           }`}
         >
-          <Calendar className="w-4 h-4" />
-          Meeting Logs
+          <span className={`pb-1 border-b-2 ${
+            activeSubTab === "logs" ? "border-blue-600" : "border-transparent"
+          }`}>
+            Meeting Logs
+          </span>
           <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold ${
-            activeSubTab === "logs" ? "bg-indigo-50 text-indigo-700 border border-indigo-100" : "bg-slate-200 text-slate-500"
+            activeSubTab === "logs" ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-100 text-slate-500"
           }`}>
             {scheduledMeetings.length}
           </span>
@@ -61,32 +64,38 @@ export default function MeetingsTabClient({ mentees, scheduledMeetings, meetingR
 
         <button
           onClick={() => setActiveSubTab("schedule")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 cursor-pointer ${
+          className={`flex items-center gap-2 py-2 text-sm font-bold transition-all duration-200 cursor-pointer ${
             activeSubTab === "schedule"
-              ? "bg-white text-slate-900 shadow-sm border border-slate-200/50"
-              : "text-slate-505 hover:text-slate-800 hover:bg-white/30"
+              ? "text-blue-600"
+              : "text-slate-450 hover:text-slate-750"
           }`}
         >
-          <PlusCircle className="w-4 h-4" />
-          Schedule Session
+          <span className={`pb-1 border-b-2 ${
+            activeSubTab === "schedule" ? "border-blue-600" : "border-transparent"
+          }`}>
+            Schedule Session
+          </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab("requests")}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 relative cursor-pointer ${
+          className={`flex items-center gap-2 py-2 text-sm font-bold transition-all duration-200 relative cursor-pointer ${
             activeSubTab === "requests"
-              ? "bg-white text-slate-900 shadow-sm border border-slate-200/50"
-              : "text-slate-505 hover:text-slate-800 hover:bg-white/30"
+              ? "text-blue-600"
+              : "text-slate-450 hover:text-slate-750"
           }`}
         >
-          <Inbox className="w-4 h-4" />
-          Student Requests
+          <span className={`pb-1 border-b-2 ${
+            activeSubTab === "requests" ? "border-blue-600" : "border-transparent"
+          }`}>
+            Student Requests
+          </span>
           {requestsCount > 0 ? (
             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-sm animate-pulse">
               {requestsCount}
             </span>
           ) : (
-            <span className="text-[10px] py-0.5 px-2 rounded-full font-bold bg-slate-200 text-slate-500">
+            <span className="text-[10px] py-0.5 px-2 rounded-full font-bold bg-slate-100 text-slate-500">
               0
             </span>
           )}

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateScheduledMeetingAttendance, updateMeetingCommonPoints, updateMeetingStudentNotes } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
+import { Calendar, MapPin, Video, Clock, Users, Download, ExternalLink, Check, FileText, Trash2, Plus, Loader2 } from "lucide-react";
 
 type StudentNote = { problem: string; action: string };
 
@@ -503,67 +504,95 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
 
   if (groups.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-        <h3 className="text-lg font-bold text-slate-800">No scheduled meetings yet</h3>
-        <p className="mt-1 text-sm font-medium text-slate-500">Create a meeting above and it will appear here for attendance tracking.</p>
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-16 text-center select-none shadow-sm max-w-xl mx-auto my-8 animate-in fade-in duration-300">
+        <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+        <h3 className="text-base font-bold text-slate-800">No scheduled meetings yet</h3>
+        <p className="mt-1 text-xs font-semibold text-slate-400 max-w-md mx-auto leading-relaxed">
+          Create a meeting above and it will appear here for attendance tracking and feedback logging.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] select-none">
+      {/* Left Column: Meeting Selection List */}
       <div className="space-y-3">
         {groups.map((group) => {
           const attendedCount = group.records.filter((record) => record.status === "Verified").length;
           const isSelected = selectedGroup?.key === group.key;
+          const isOnline = group.mode?.toUpperCase() === "ONLINE";
 
           return (
             <button
               key={group.key}
               type="button"
               onClick={() => setSelectedKey(group.key)}
-              className={`w-full rounded-lg border p-4 text-left shadow-sm transition ${
-                isSelected ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white hover:border-blue-200"
+              className={`w-full rounded-xl border p-4 text-left transition-all duration-200 cursor-pointer shadow-sm relative ${
+                isSelected 
+                  ? "border-blue-400 bg-blue-50/40 ring-1 ring-blue-400/20" 
+                  : "border-slate-200 bg-white hover:border-slate-350 hover:shadow"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate font-bold text-slate-900">{group.topic}</h3>
-                  <p className="mt-1 text-sm font-medium text-slate-500">
-                    {group.date || "Date pending"} {group.time ? `at ${group.time}` : ""}
-                  </p>
+                <div className="min-w-0 space-y-1">
+                  <h3 className={`font-bold text-sm truncate ${isSelected ? "text-blue-900" : "text-slate-800"}`}>
+                    {group.topic}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                    <Calendar className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                    <span>{group.date || "Date pending"}</span>
+                  </div>
+                  {group.time && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                      <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <span>{group.time}</span>
+                    </div>
+                  )}
                 </div>
-                <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-blue-700 shadow-sm">
-                  {attendedCount}/{group.records.length}
-                </span>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isSelected ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+                  }`}>
+                    <Users className="w-3 h-3" />
+                    {attendedCount}/{group.records.length}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                    isOnline 
+                      ? "bg-indigo-50 border-indigo-100 text-indigo-700" 
+                      : "bg-slate-50 border-slate-200 text-slate-600"
+                  }`}>
+                    {isOnline ? <Video className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                    {group.mode || "Offline"}
+                  </span>
+                </div>
               </div>
-              <p className="mt-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-                {group.mode || "Offline"}
-              </p>
             </button>
           );
         })}
       </div>
 
+      {/* Right Column: Group Detail Board */}
       {selectedGroup && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Section Header */}
+          <div className="border-b border-slate-100 p-6 space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">{selectedGroup.topic}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  {selectedGroup.date || "Date pending"} {selectedGroup.time ? `at ${selectedGroup.time}` : ""} / {selectedGroup.mode || "Offline"}
-                </p>
+                <h2 className="text-xl font-extrabold text-slate-900 leading-tight">{selectedGroup.topic}</h2>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs font-semibold text-slate-500">
+                  <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.date || "N/A"}</span>
+                  {selectedGroup.time && <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.time}</span>}
+                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {selectedGroup.venue || selectedGroup.mode || "Offline"}</span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => void exportMeetingReportPdf(selectedGroup)}
-                  className="flex items-center gap-1.5 w-fit rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition cursor-pointer active:scale-[0.98]"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 19.164l-.22-1.033A8.001 8.001 0 0113.5 10.5h.75V8.25A2.25 2.25 0 0012 6H4.5A2.25 2.25 0 002.25 8.25v10.5A2.25 2.25 0 004.5 21h2.22m12.78-1.836l.22 1.033A8.001 8.001 0 0110.5 13.5h-.75V15.75a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0021.75 15.75v-10.5A2.25 2.25 0 0019.5 3h-2.22" />
-                  </svg>
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
                   Export PDF
                 </button>
                 {selectedGroup.link && (
@@ -571,40 +600,48 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
                     href={selectedGroup.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-fit rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                    className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 transition cursor-pointer active:scale-[0.98]"
                   >
+                    <ExternalLink className="w-3.5 h-3.5" />
                     Open Link
                   </a>
                 )}
               </div>
             </div>
-            <p className="mt-4 whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
-              {selectedGroup.agenda || "No agenda provided."}
-            </p>
+
+            <div className="border-l-4 border-slate-300 bg-slate-50/50 px-4.5 py-3 rounded-r-xl select-none">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">Meeting Agenda</span>
+              <p className="text-sm font-semibold leading-relaxed text-slate-650 whitespace-pre-wrap">
+                {selectedGroup.agenda || "No agenda provided."}
+              </p>
+            </div>
 
             {/* Common Points Section */}
-            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                Common Points Related to All Students
-              </label>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                  Common Points Related to All Students
+                </label>
+              </div>
               <textarea
                 value={commonPointsText}
                 onChange={(e) => { setCommonPointsText(e.target.value); setCommonPointsMessage(""); }}
-                rows={4}
+                rows={3}
                 placeholder="Enter common discussion points, observations, or notes that apply to all students in this meeting..."
-                className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3.5 text-sm leading-relaxed text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-semibold placeholder:font-medium placeholder:text-slate-400 shadow-inner"
               />
-              <div className="mt-2 flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => void handleSaveCommonPoints()}
                   disabled={savingCommonPoints}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+                  className="rounded-xl bg-blue-600 px-4.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] cursor-pointer disabled:opacity-60"
                 >
                   {savingCommonPoints ? "Saving..." : "Save Common Points"}
                 </button>
                 {commonPointsMessage && (
-                  <span className={`text-sm font-semibold ${commonPointsMessage === "Saved!" ? "text-green-600" : "text-red-600"}`}>
+                  <span className={`text-xs font-bold ${commonPointsMessage === "Saved!" ? "text-green-600" : "text-red-600"}`}>
                     {commonPointsMessage}
                   </span>
                 )}
@@ -612,7 +649,8 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          {/* Student Roster Lists */}
+          <div className="divide-y divide-slate-100 bg-white">
             {selectedGroup.records.map((meeting) => {
               const student = meeting.student;
               const studentName = student?.fullName || meeting.studentName || "Unknown Student";
@@ -623,123 +661,153 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
               const noteCount = currentNotes.filter((n) => n.problem || n.action).length;
 
               return (
-                <div key={meeting.$id} className="p-5">
-                  <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div key={meeting.$id} className="p-6 transition hover:bg-slate-50/20">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <Link
                       href={`?tab=student-profile&id=${meeting.studentId}`}
-                      className="flex min-w-0 items-center gap-4 rounded-lg p-1 transition hover:bg-slate-50"
+                      className="flex min-w-0 items-center gap-4 group"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-blue-100 bg-blue-50 text-sm font-bold text-blue-700">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 shadow-sm group-hover:border-blue-200">
                         {student?.profilePictureId ? (
                           <img
                             src={getFileViewUrl(student.profilePictureId)}
                             alt={`${studentName} Profile`}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                           />
                         ) : (
                           getInitials(studentName)
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-900">{studentName}</p>
-                        <p className="truncate text-sm text-slate-500">{student?.email || "No email available"}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {student?.department && (
-                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.department}</span>
-                          )}
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="truncate font-extrabold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">{studentName}</p>
+                        <p className="truncate text-xs text-slate-455 font-semibold">{student?.email || "No email available"}</p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
                           {student?.rollNo && (
-                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{student.rollNo}</span>
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.rollNo}</span>
+                          )}
+                          {student?.department && (
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-extrabold text-slate-550 uppercase tracking-wider">{student.department}</span>
                           )}
                         </div>
                       </div>
                     </Link>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={attended}
-                          disabled={updatingId === meeting.$id}
-                          onChange={(event) => handleAttendance(meeting, event.target.checked)}
-                          className="h-4 w-4 accent-blue-600"
-                        />
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        disabled={updatingId === meeting.$id}
+                        onClick={() => void handleAttendance(meeting, !attended)}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 border cursor-pointer ${
+                          attended
+                            ? "bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100/70"
+                            : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        {updatingId === meeting.$id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : attended ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                        )}
                         {updatingId === meeting.$id ? "Updating..." : attended ? "Met" : "Mark Met"}
-                      </label>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setOpenNotesId(isNotesOpen ? null : meeting.$id)}
-                        className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition ${
+                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                           isNotesOpen
-                            ? "border-amber-300 bg-amber-50 text-amber-700"
+                            ? "border-amber-300 bg-amber-50 text-amber-800"
                             : noteCount > 0
-                              ? "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300"
-                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-200"
+                              ? "border-amber-200 bg-amber-50/50 text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+                              : "border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:border-slate-355"
                         }`}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                          <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
-                          <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
-                        </svg>
-                        Action{noteCount > 0 ? ` (${noteCount})` : ""}
+                        <FileText className="w-4 h-4 shrink-0 text-slate-500" />
+                        Action Dossier{noteCount > 0 ? ` (${noteCount})` : ""}
                       </button>
                     </div>
                   </div>
 
                   {/* Student Notes Inline Editor */}
                   {isNotesOpen && (
-                    <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50/40 p-4">
-                      <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">Problems Faced & Solutions</p>
+                    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/15 p-5 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Student Incident Logs & Feedback</p>
+                      </div>
+                      
                       {currentNotes.length === 0 && (
-                        <p className="mb-3 text-sm text-slate-500">No problems recorded. Click "Add Problem" to start.</p>
+                        <p className="text-xs font-semibold text-slate-450 italic py-1">No individual student logs entered for this meeting slot. Click "Add Problem" to record feedback.</p>
                       )}
-                      <div className="space-y-3">
+
+                      <div className="space-y-4">
                         {currentNotes.map((note, noteIndex) => (
-                          <div key={noteIndex} className="rounded-lg border border-slate-200 bg-white p-3">
-                            <div className="mb-2 flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-500">Problem #{noteIndex + 1}</span>
+                          <div key={noteIndex} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm relative space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <span className="text-xs font-extrabold text-slate-500">Record #{noteIndex + 1}</span>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveNote(meeting.$id, noteIndex, meeting)}
-                                className="text-xs font-bold text-red-500 hover:text-red-700"
+                                className="flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 cursor-pointer"
                               >
-                                Remove
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
                               </button>
                             </div>
-                            <textarea
-                              value={note.problem}
-                              onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "problem", e.target.value, meeting)}
-                              rows={2}
-                              placeholder="Problem Faced: Describe the problem faced by the student..."
-                              className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                            />
-                            <textarea
-                              value={note.action}
-                              onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "action", e.target.value, meeting)}
-                              rows={2}
-                              placeholder="Solution / Action Taken: Describe the action taken or solution..."
-                              className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                            />
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Observed Issue / Problem Faced</label>
+                                <textarea
+                                  value={note.problem}
+                                  onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "problem", e.target.value, meeting)}
+                                  rows={2}
+                                  placeholder="Describe any academic, logistical, or personal challenges..."
+                                  className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-xs font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-wider block">Action Taken / Proposed Solution</label>
+                                <textarea
+                                  value={note.action}
+                                  onChange={(e) => handleUpdateNote(meeting.$id, noteIndex, "action", e.target.value, meeting)}
+                                  rows={2}
+                                  placeholder="Describe the solution, guidance, or next steps suggested..."
+                                  className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-xs font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition"
+                                />
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
+
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
                         <button
                           type="button"
                           onClick={() => handleAddNote(meeting.$id, meeting)}
-                          className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+                          className="flex items-center gap-1.5 rounded-xl border border-dashed border-slate-350 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-650 transition cursor-pointer"
                         >
-                          + Add Problem
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Incident Note
                         </button>
                         <button
                           type="button"
                           onClick={() => void handleSaveNotes(meeting.$id, meeting)}
                           disabled={savingNotesId === meeting.$id}
-                          className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-60"
+                          className="flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer disabled:opacity-60"
                         >
-                          {savingNotesId === meeting.$id ? "Saving..." : "Save Notes"}
+                          {savingNotesId === meeting.$id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          Save Logs
                         </button>
                         {notesMessage[meeting.$id] && (
-                          <span className={`text-sm font-semibold ${notesMessage[meeting.$id] === "Saved!" ? "text-green-600" : "text-red-600"}`}>
+                          <span className={`text-xs font-extrabold tracking-wide uppercase px-2.5 py-1 rounded-full ${
+                            notesMessage[meeting.$id] === "Saved!" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                          }`}>
                             {notesMessage[meeting.$id]}
                           </span>
                         )}

@@ -63,27 +63,41 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   // Fetch specific student data if the mentor is viewing a profile OR logging a meeting
   let selectedStudent = null;
   let latestAcademicRecord = null;
-  let academicRecords = [];
-  let achievementRecords = [];
+  let academicRecords: any[] = [];
+  let achievementRecords: any[] = [];
   let mentorNote = null;
   if ((activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements') && studentId) {
-    selectedStudent = await getMenteeProfile(studentId);
-    if (selectedStudent?.mentorId !== user.$id) {
-      selectedStudent = null;
-    }
-    if (selectedStudent && activeTab === 'student-profile') {
-      const [latAcad, noteRes, achRes] = await Promise.all([
+    if (activeTab === 'student-profile') {
+      const [fetchedStudent, latAcad, noteRes, achRes] = await Promise.all([
+        getMenteeProfile(studentId),
         getLatestAcademicRecord(studentId),
         getMentorNote(studentId),
         getAchievementRecordsForProfile(studentId)
       ]);
+      selectedStudent = fetchedStudent;
       latestAcademicRecord = latAcad;
       mentorNote = noteRes;
       achievementRecords = achRes;
-    } else if (selectedStudent && activeTab === 'student-academics') {
-      academicRecords = await getAcademicRecordsForProfile(studentId);
-    } else if (selectedStudent && activeTab === 'student-achievements') {
-      achievementRecords = await getAchievementRecordsForProfile(studentId);
+    } else if (activeTab === 'student-academics') {
+      const [fetchedStudent, acadRecs] = await Promise.all([
+        getMenteeProfile(studentId),
+        getAcademicRecordsForProfile(studentId)
+      ]);
+      selectedStudent = fetchedStudent;
+      academicRecords = acadRecs || [];
+    } else if (activeTab === 'student-achievements') {
+      const [fetchedStudent, achRecs] = await Promise.all([
+        getMenteeProfile(studentId),
+        getAchievementRecordsForProfile(studentId)
+      ]);
+      selectedStudent = fetchedStudent;
+      achievementRecords = achRecs || [];
+    } else {
+      selectedStudent = await getMenteeProfile(studentId);
+    }
+
+    if (selectedStudent?.mentorId !== user.$id) {
+      selectedStudent = null;
     }
   }
 
