@@ -41,10 +41,11 @@ import {
   LayoutDashboard
 } from "lucide-react";
 
-export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string, q?: string }> }) {
+export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string, q?: string, meetingGroupId?: string }> }) {
   const searchParams = await props.searchParams;
   const activeTab = searchParams.tab || "dashboard";
   const studentId = searchParams.id;
+  const meetingGroupId = searchParams.meetingGroupId;
 
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
@@ -336,13 +337,22 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                 </Link>
               )}
               
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-                {pageTitle}
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 flex items-center gap-3">
+                {activeTab === 'meetings' && meetingGroupId && (
+                  <Link 
+                    href="?tab=meetings"
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-950 hover:bg-slate-50 transition-all shadow-sm shrink-0 inline-flex items-center justify-center cursor-pointer"
+                    title="Back to Meetings List"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Link>
+                )}
+                <span>{pageTitle}</span>
               </h1>
             </div>
             
             <div className="mb-2 lg:mb-0 flex items-center gap-4">
-              {activeTab === 'roster' && <HeaderSearchBar />}
+              {(activeTab === 'roster' || (activeTab === 'meetings' && !meetingGroupId)) && <HeaderSearchBar />}
               <NotificationBell />
             </div>
           </div>
