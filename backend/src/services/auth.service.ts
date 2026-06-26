@@ -1,16 +1,12 @@
-import { Account, Databases, ID, Query } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class AuthService {
   static async signUp(email: string, password: string, name: string, rollNo: string | null) {
     try {
-      const adminClient = createAdminClient();
-      const account = new Account(adminClient);
-
-      const newAccount = await account.create(ID.unique(), email, password, name);
-      const session = await account.createEmailPasswordSession(email, password);
-
-      const adminDatabases = new Databases(adminClient);
+      const auth = servicesContainer.getAuthService();
+      const db = servicesContainer.getDatabaseService();
+      const newAccount = await auth.createUser(email, name, "pending", password);
+      const session = await auth.createEmailPasswordSession(email, password);
 
       const emailLower = email.toLowerCase().trim();
       const rollNoValue = rollNo?.trim() || "";
@@ -27,10 +23,8 @@ export class AuthService {
       const isAllowedMentorDomain = allowedDomains.length === 0 || allowedDomains.includes(emailDomain);
       const assignedRole = !isStudent && isAllowedMentorDomain ? "mentor" : "mentee";
 
-      await adminDatabases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      await db.createDocument(
         process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        newAccount.$id,
         {
           fullName: name,
           email: emailLower,
@@ -38,12 +32,13 @@ export class AuthService {
           department: "Unassigned",
           role: assignedRole,
           isVerified: false,
-        }
+        },
+        newAccount.userId
       );
 
       return {
-        sessionSecret: session.secret,
-        userId: newAccount.$id,
+        sessionSecret: session.sessionSecret,
+        userId: newAccount.userId,
         role: assignedRole,
       };
     } catch (error: any) {
@@ -54,22 +49,18 @@ export class AuthService {
 
   static async signIn(email: string, password: string) {
     try {
-      const adminClient = createAdminClient();
-      const account = new Account(adminClient);
-
+      const auth = servicesContainer.getAuthService();
+      const db = servicesContainer.getDatabaseService();
       const emailLower = email.toLowerCase().trim();
-      const session = await account.createEmailPasswordSession(emailLower, password);
+      const session = await auth.createEmailPasswordSession(emailLower, password);
 
       let userRole = "mentee";
       let actualProfileId = session.userId;
 
       try {
-        const adminDatabases = new Databases(adminClient);
-
-        const profilesList = await adminDatabases.listDocuments(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        const profilesList = await db.listDocuments<any>(
           process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-          [Query.equal("email", [emailLower])]
+          { equals: { email: emailLower } }
         );
 
         if (profilesList.total > 0) {
@@ -81,7 +72,7 @@ export class AuthService {
       }
 
       return {
-        sessionSecret: session.secret,
+        sessionSecret: session.sessionSecret,
         userId: actualProfileId,
         role: userRole,
       };
@@ -93,9 +84,7 @@ export class AuthService {
 
   static async logout(sessionSecret: string) {
     try {
-      const sessionClient = createSessionClient(sessionSecret);
-      const account = new Account(sessionClient);
-      await account.deleteSession("current");
+      await servicesContainer.getAuthService().deleteCurrentSession(sessionSecret);
       return { success: true };
     } catch (error: any) {
       console.error("AuthService.logout error:", error);
@@ -105,9 +94,7 @@ export class AuthService {
 
   static async getUser(sessionSecret: string) {
     try {
-      const sessionClient = createSessionClient(sessionSecret);
-      const account = new Account(sessionClient);
-      return await account.get();
+      return await servicesContainer.getAuthService().getSessionUser(sessionSecret);
     } catch (error: any) {
       console.error("AuthService.getUser error:", error);
       return null;
@@ -119,11 +106,9 @@ export class AuthService {
       const user = await this.getUser(sessionSecret);
       if (!user) return null;
 
-      const databases = new Databases(createAdminClient());
-      const profiles = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const profiles = await servicesContainer.getDatabaseService().listDocuments<any>(
         process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        [Query.equal("email", [user.email.toLowerCase().trim()])]
+        { equals: { email: user.email.toLowerCase().trim() } }
       );
 
       if (profiles.total === 0) return null;

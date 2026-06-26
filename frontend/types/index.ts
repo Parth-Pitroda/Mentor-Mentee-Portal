@@ -111,6 +111,7 @@ export interface Meeting {
   discussionNotes?: string;
   description?: string;
   mentorName?: string;
+  studentName?: string;
   proposedTime?: string;
   status?: "Requested" | "Confirmed" | "Scheduled" | "Pending" | "Verified" | "Rejected";
 }

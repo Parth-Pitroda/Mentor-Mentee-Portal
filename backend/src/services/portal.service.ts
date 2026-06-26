@@ -1,7 +1,5 @@
-import { Databases, ID, Query, Storage, Users } from "node-appwrite";
-import { createAdminClient } from "../../app";
-
-const { InputFile } = require("node-appwrite/file");
+import { servicesContainer } from "../config/providers";
+import { Query } from "../interface/database.interface";
 
 type PortalContext = {
   user: any;
@@ -42,12 +40,19 @@ const mentorNotesId = () => {
 
 const asJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
-function adminDatabases() {
-  return new Databases(createAdminClient());
-}
+const ID = {
+  unique: () => "",
+};
 
-function adminStorage() {
-  return new Storage(createAdminClient());
+function adminDatabases() {
+  const db = servicesContainer.getDatabaseService();
+  return {
+    getDocument: (_databaseId: string, collectionId: string, documentId: string) => db.getDocument<any>(collectionId, documentId),
+    listDocuments: (_databaseId: string, collectionId: string, queries?: any) => db.listDocuments<any>(collectionId, queries),
+    createDocument: (_databaseId: string, collectionId: string, documentId: string, data: any) => db.createDocument<any>(collectionId, data, documentId),
+    updateDocument: (_databaseId: string, collectionId: string, documentId: string, data: any) => db.updateDocument<any>(collectionId, documentId, data),
+    deleteDocument: (_databaseId: string, collectionId: string, documentId: string) => db.deleteDocument(collectionId, documentId),
+  };
 }
 
 function requireRole(ctx: PortalContext, roles: string[]) {
@@ -99,14 +104,13 @@ function decodeFile(file: EncodedFile | null | undefined, options: { required: b
   if (!options.allowedTypes.includes(file.type)) {
     throw new Error("Unsupported file type.");
   }
-  return InputFile.fromBuffer(Buffer.from(file.base64, "base64"), file.name);
+  return file;
 }
 
 async function uploadFile(file: EncodedFile | null | undefined, options: { required: boolean; maxBytes: number; allowedTypes: string[] }) {
-  const inputFile = decodeFile(file, options);
-  if (!inputFile) return null;
-  const uploaded = await adminStorage().createFile(bucketId(), ID.unique(), inputFile);
-  return uploaded.$id;
+  const validFile = decodeFile(file, options);
+  if (!validFile) return null;
+  return servicesContainer.getStorageService().uploadFile(validFile);
 }
 
 async function createNotification(userId: string, message: string, type: string, relatedId?: string) {
@@ -571,15 +575,14 @@ export class PortalService {
 
   static async bulkImportStudents({ studentList }: { studentList: Array<{ fullName: string; email: string; department: string }> }, ctx: PortalContext) {
     requireRole(ctx, ["admin", "coordinator"]);
-    const client = createAdminClient();
-    const db = new Databases(client);
-    const users = new Users(client);
+    const db = adminDatabases();
+    const auth = servicesContainer.getAuthService();
     let successCount = 0;
     const errors: string[] = [];
     for (const student of studentList) {
       try {
         const emailLower = student.email.toLowerCase().trim();
-        await users.create(ID.unique(), emailLower, undefined, "Pdeu@2026", student.fullName.trim());
+        await auth.createUser(emailLower, student.fullName.trim(), "mentee");
         await db.createDocument(databaseId(), profilesId(), ID.unique(), {
           email: emailLower,
           fullName: student.fullName.trim(),
@@ -788,7 +791,7 @@ export class PortalService {
   static async importMasterAdvisoryList({ text }: { text: string }, ctx: PortalContext) {
     requireRole(ctx, ["admin", "coordinator"]);
     const db = adminDatabases();
-    const users = new Users(createAdminClient());
+    const auth = servicesContainer.getAuthService();
     const mentors = await db.listDocuments(databaseId(), profilesId(), [Query.equal("role", ["mentor"])]);
     const lines = String(text || "").split(/\r?\n/);
     let count = 0;
@@ -817,7 +820,7 @@ export class PortalService {
         continue;
       }
       try {
-        await users.create(ID.unique(), email, undefined, `Pdeu@${cleanRollNo}`, fullName);
+        await auth.createUser(email, fullName, "mentee", `Pdeu@${cleanRollNo}`);
       } catch (error: any) {
         if (error.code !== 409) throw error;
       }

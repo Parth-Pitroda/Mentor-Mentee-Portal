@@ -8,16 +8,10 @@ import {
 } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton";
 import { getFileViewUrl } from "@/lib/files";
+import MentorSidebar from "@/components/MentorSidebar";
 import MentorNotesEditor from "@/components/MentorNotesEditor";
-import { 
-  Users, 
-  CheckSquare, 
-  CalendarDays, 
-  Bell, 
-  LayoutDashboard 
-} from "lucide-react";
+import type { Meeting } from "@/types";
 
 export default async function MentorStudentDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -47,70 +41,12 @@ export default async function MentorStudentDetailPage(props: { params: Promise<{
     return name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
-  const studentMeetings = (scheduledMeetings || []).filter((m: any) => m.studentId === student.$id || m.studentName === student.fullName);
+  const studentMeetings = (scheduledMeetings || []).filter((m: Meeting) => m.studentId === student.$id || m.studentName === student.fullName);
   const totalMeetingsCount = studentMeetings.length;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-poppins selection:bg-blue-100 selection:text-blue-900 flex">
-      
-      {/* ================= FULL-HEIGHT SIDEBAR ================= */}
-      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-64 flex-col bg-[#1A1A24] text-white md:flex animate-in fade-in duration-300">
-        {/* BRANDING LOGO */}
-        <div className="flex h-24 shrink-0 items-center justify-center border-b border-white/5 px-6">
-          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-14 w-auto object-contain" />
-        </div>
-
-        {/* NAVIGATION */}
-        <nav className="flex-1 overflow-y-auto py-6 pl-4 pr-0 space-y-1.5">
-          <Link 
-            href="/mentor-dashboard?tab=dashboard" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
-          >
-            <span>Dashboard</span>
-          </Link>
-
-          <Link 
-            href="/mentor-dashboard?tab=roster" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0"
-          >
-            <span>My Mentees</span>
-            {/* Top curve */}
-            <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-              <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-            </div>
-            {/* Bottom curve */}
-            <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-              <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-            </div>
-          </Link>
-
-          <Link 
-            href="/mentor-dashboard?tab=meetings" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
-          >
-            <span>Meetings</span>
-          </Link>
-
-          <Link 
-            href="/mentor-dashboard/approvals" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
-          >
-            <span>Pending Approvals</span>
-          </Link>
-
-          <Link 
-            href="/mentor-dashboard?tab=notices" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
-          >
-            <span>Global Notices</span>
-          </Link>
-        </nav>
-        
-        {/* USER PROFILE & LOGOUT */}
-        <div className="p-4 border-t border-white/5 bg-transparent">
-           <LogoutButton variant="sidebar-dark" />
-        </div>
-      </aside>
+      <MentorSidebar activeItem="roster" userName={user.name} />
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <div className="md:ml-64 min-h-screen flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">

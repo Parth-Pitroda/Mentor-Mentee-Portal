@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-interface EnrichedStudent {
+export interface EnrichedStudent {
   $id: string;
   fullName: string;
   email: string;

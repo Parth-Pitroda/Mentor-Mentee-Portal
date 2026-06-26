@@ -1,53 +1,27 @@
-import { Databases, ID } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class ProfileService {
   static async getMyProfile(sessionSecret: string) {
-    const databases = new Databases(createSessionClient(sessionSecret));
-    const profiles = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      [/* Filter by current user session logic is handled by SDK if we use correct IDs */]
-    );
+    const db = servicesContainer.getSessionDatabaseService(sessionSecret);
+    const profiles = await db.listDocuments(process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!);
     // In this architecture, we'll fetch by user ID from the session
     // For simplicity, we can list and find the one matching the session user
     return profiles.documents[0];
   }
 
   static async getProfileById(id: string) {
-    const databases = new Databases(createAdminClient());
-    return await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      id
-    );
+    return await servicesContainer.getDatabaseService().getDocument(process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, id);
   }
 
   static async updateProfile(id: string, data: any, sessionSecret: string) {
-    const databases = new Databases(createSessionClient(sessionSecret));
-    return await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      id,
-      data
-    );
+    return await servicesContainer.getSessionDatabaseService(sessionSecret).updateDocument(process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, id, data);
   }
 
   static async listMentees() {
-    const databases = new Databases(createAdminClient());
-    return await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      // Query for role = mentee
-    );
+    return await servicesContainer.getDatabaseService().listDocuments(process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, { equals: { role: "mentee" } });
   }
 
   static async listMentors() {
-    const databases = new Databases(createAdminClient());
-    return await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-      // Query for role = mentor
-    );
+    return await servicesContainer.getDatabaseService().listDocuments(process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, { equals: { role: "mentor" } });
   }
 }

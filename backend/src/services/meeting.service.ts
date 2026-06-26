@@ -1,14 +1,11 @@
-import { Databases, ID, Query } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "../../app";
 import { NotificationService } from "./notification.service";
+import { servicesContainer } from "../config/providers";
 
 export class MeetingService {
-  private static getAdminDatabases() {
-    return new Databases(createAdminClient());
-  }
-
-  private static getSessionDatabases(sessionSecret: string) {
-    return new Databases(createSessionClient(sessionSecret));
+  private static getDatabase(sessionSecret?: string) {
+    return sessionSecret
+      ? servicesContainer.getSessionDatabaseService(sessionSecret)
+      : servicesContainer.getDatabaseService();
   }
 
   /**
@@ -16,14 +13,10 @@ export class MeetingService {
    */
   static async getStudentMeetings(studentId: string, sessionSecret?: string) {
     try {
-      const databases = sessionSecret ? this.getSessionDatabases(sessionSecret) : this.getAdminDatabases();
-      const result = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const db = this.getDatabase(sessionSecret);
+      const result = await db.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [
-          Query.equal("studentId", [studentId]),
-          Query.orderDesc("date"),
-        ]
+        { equals: { studentId }, orderByDesc: "date" }
       );
       return JSON.parse(JSON.stringify(result.documents));
     } catch (error) {
@@ -37,15 +30,9 @@ export class MeetingService {
    */
   static async getRecentMeetings(studentId: string, limit: number = 5) {
     try {
-      const databases = this.getAdminDatabases();
-      const result = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const result = await this.getDatabase().listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [
-          Query.equal("studentId", [studentId]),
-          Query.orderDesc("date"),
-          Query.limit(limit),
-        ]
+        { equals: { studentId }, orderByDesc: "date", limit }
       );
       return JSON.parse(JSON.stringify(result.documents));
     } catch (error) {
@@ -59,14 +46,9 @@ export class MeetingService {
    */
   static async getPendingRequests(studentId: string) {
     try {
-      const databases = this.getAdminDatabases();
-      const result = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const result = await this.getDatabase().listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [
-          Query.equal("studentId", [studentId]),
-          Query.equal("status", ["Requested"]),
-        ]
+        { equals: { studentId, status: "Requested" } }
       );
       return JSON.parse(JSON.stringify(result.documents));
     } catch (error) {
@@ -80,12 +62,10 @@ export class MeetingService {
    */
   static async createMeeting(data: any, sessionSecret?: string) {
     try {
-      const databases = sessionSecret ? this.getSessionDatabases(sessionSecret) : this.getAdminDatabases();
+      const db = this.getDatabase(sessionSecret);
 
-      const createdMeeting = await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const createdMeeting = await db.createDocument<any>(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        ID.unique(),
         {
           studentId: data.studentId,
           date: data.date,
@@ -118,10 +98,9 @@ export class MeetingService {
    */
   static async updateMeeting(meetingId: string, updates: any, sessionSecret?: string) {
     try {
-      const databases = sessionSecret ? this.getSessionDatabases(sessionSecret) : this.getAdminDatabases();
+      const db = this.getDatabase(sessionSecret);
 
-      const updatedMeeting = await databases.updateDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const updatedMeeting = await db.updateDocument(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
         meetingId,
         updates
@@ -139,11 +118,10 @@ export class MeetingService {
    */
   static async getMentorRequests(mentorId: string) {
     try {
-      const databases = this.getAdminDatabases();
-      const menteesList = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const db = this.getDatabase();
+      const menteesList = await db.listDocuments<any>(
         process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        [Query.equal("mentorId", [mentorId]), Query.limit(100)]
+        { equals: { mentorId }, limit: 100 }
       );
 
       if (menteesList.total === 0) return [];
@@ -154,14 +132,9 @@ export class MeetingService {
         studentMap[doc.$id] = doc.fullName || "Unknown Student";
       });
 
-      const requests = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const requests = await db.listDocuments<any>(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [
-          Query.equal("studentId", menteeIds),
-          Query.equal("status", ["Requested"]),
-          Query.orderDesc("$createdAt"),
-        ]
+        { equals: { studentId: menteeIds, status: "Requested" }, orderByDesc: "$createdAt" }
       );
 
       return requests.documents.map((request) => ({
@@ -179,11 +152,10 @@ export class MeetingService {
    */
   static async getMentorScheduled(mentorId: string) {
     try {
-      const databases = this.getAdminDatabases();
-      const menteesList = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const db = this.getDatabase();
+      const menteesList = await db.listDocuments<any>(
         process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-        [Query.equal("mentorId", [mentorId]), Query.limit(100)]
+        { equals: { mentorId }, limit: 100 }
       );
 
       if (menteesList.total === 0) return [];
@@ -194,14 +166,9 @@ export class MeetingService {
         studentMap[doc.$id] = doc.fullName || "Unknown Student";
       });
 
-      const scheduled = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const scheduled = await db.listDocuments<any>(
         process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!,
-        [
-          Query.equal("studentId", menteeIds),
-          Query.equal("status", ["Confirmed"]),
-          Query.orderAsc("date"),
-        ]
+        { equals: { studentId: menteeIds, status: "Confirmed" }, orderByAsc: "date" }
       );
 
       return scheduled.documents.map((meeting) => ({

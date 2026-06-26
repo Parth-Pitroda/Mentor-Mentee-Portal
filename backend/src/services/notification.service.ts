@@ -1,18 +1,11 @@
-import { Databases, ID } from "node-appwrite";
-import { createAdminClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class NotificationService {
-  private static getAdminDatabases() {
-    return new Databases(createAdminClient());
-  }
-
   static async createNotification(userId: string, message: string, type: string, relatedId?: string) {
     try {
-      const databases = this.getAdminDatabases();
-      await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const db = servicesContainer.getDatabaseService();
+      await db.createDocument(
         process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATIONS_COLLECTION_ID!,
-        ID.unique(),
         {
           userId,
           message,
@@ -29,9 +22,8 @@ export class NotificationService {
 
   static async notifyAssignedMentor(studentId: string, message: string, type: string, relatedId?: string) {
     try {
-      const databases = this.getAdminDatabases();
-      const student = await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const db = servicesContainer.getDatabaseService();
+      const student = await db.getDocument<any>(
         process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
         studentId
       );

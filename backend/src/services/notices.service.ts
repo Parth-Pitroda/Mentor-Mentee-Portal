@@ -1,25 +1,15 @@
-import { Databases, ID, Query } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class NoticeService {
-  private static getAdminDatabases() {
-    return new Databases(createAdminClient());
-  }
-
-  private static getSessionDatabases(sessionSecret: string) {
-    return new Databases(createSessionClient(sessionSecret));
-  }
-
   static async getNotices(sessionSecret?: string) {
     try {
-      const databases = sessionSecret
-        ? this.getSessionDatabases(sessionSecret)
-        : this.getAdminDatabases();
+      const db = sessionSecret
+        ? servicesContainer.getSessionDatabaseService(sessionSecret)
+        : servicesContainer.getDatabaseService();
 
-      const response = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const response = await db.listDocuments(
         process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!,
-        [Query.orderDesc("$createdAt")]
+        { orderByDesc: "$createdAt" }
       );
 
       return response.documents;
@@ -30,11 +20,8 @@ export class NoticeService {
 
   static async createNotice(data: { title: string; content: string; targetAudience: string }) {
     try {
-      const databases = this.getAdminDatabases();
-      const response = await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      const response = await servicesContainer.getDatabaseService().createDocument(
         process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!,
-        ID.unique(),
         {
           ...data,
           createdAt: new Date().toISOString(),

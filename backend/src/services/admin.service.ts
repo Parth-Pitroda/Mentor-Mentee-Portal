@@ -1,29 +1,15 @@
-import { Databases, ID, Query, Users } from "node-appwrite";
-import { createAdminClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class AdminService {
-  private static getAdminDatabases() {
-    return new Databases(createAdminClient());
-  }
-
   static async getSystemAnalytics() {
     try {
-      const databases = this.getAdminDatabases();
+      const db = servicesContainer.getDatabaseService();
+      const profileColl = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+      const meetingColl = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
       const [mentees, verifiedMentees, meetings] = await Promise.all([
-        databases.listDocuments(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-          [Query.equal("role", ["mentee"])]
-        ),
-        databases.listDocuments(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-          [Query.equal("role", ["mentee"]), Query.equal("isVerified", [true])]
-        ),
-        databases.listDocuments(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!
-        )
+        db.listDocuments(profileColl, { equals: { role: "mentee" } }),
+        db.listDocuments(profileColl, { equals: { role: "mentee", isVerified: true } }),
+        db.listDocuments(meetingColl)
       ]);
 
       return {
@@ -40,19 +26,20 @@ export class AdminService {
 
   static async assignMentor(studentId: string, mentorId: string) {
     try {
-      const databases = this.getAdminDatabases();
+      const db = servicesContainer.getDatabaseService();
+      const profileColl = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
+
       const [student, mentor] = await Promise.all([
-        databases.getDocument(process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!, process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, studentId),
-        databases.getDocument(process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!, process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!, mentorId),
+        db.getDocument(profileColl, studentId),
+        db.getDocument(profileColl, mentorId),
       ]);
 
-      if (student.role !== "mentee" || mentor.role !== "mentor") {
+      if ((student as any).role !== "mentee" || (mentor as any).role !== "mentor") {
         throw new Error("Please select a valid student and mentor.");
       }
 
-      await databases.updateDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
+      await db.updateDocument(
+        profileColl,
         studentId,
         { mentorId: mentorId }
       );
@@ -66,11 +53,10 @@ export class AdminService {
 
   static async createGlobalNotice(title: string, content: string) {
     try {
-      const databases = this.getAdminDatabases();
-      await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!,
-        ID.unique(),
+      const db = servicesContainer.getDatabaseService();
+      const noticeColl = process.env.NEXT_PUBLIC_APPWRITE_NOTICES_COLLECTION_ID!;
+      await db.createDocument(
+        noticeColl,
         { title, content }
       );
       return { success: true };
@@ -82,9 +68,9 @@ export class AdminService {
 
   static async bulkImportStudents(studentList: Array<{ fullName: string, email: string, department: string }>) {
     try {
-      const adminClient = createAdminClient();
-      const databases = new Databases(adminClient);
-      const users = new Users(adminClient);
+      const auth = servicesContainer.getAuthService();
+      const db = servicesContainer.getDatabaseService();
+      const profileColl = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
 
       let successCount = 0;
       let errors = [];
@@ -92,11 +78,9 @@ export class AdminService {
       for (const student of studentList) {
         try {
           const emailLower = student.email.toLowerCase().trim();
-          await users.create(ID.unique(), emailLower, undefined, "Pdeu@2026", student.fullName.trim());
-          await databases.createDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!,
-            ID.unique(),
+          await auth.createUser(emailLower, student.fullName.trim(), "mentee");
+          await db.createDocument(
+            profileColl,
             {
               email: emailLower,
               fullName: student.fullName.trim(),

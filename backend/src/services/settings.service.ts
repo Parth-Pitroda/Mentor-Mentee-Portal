@@ -1,5 +1,4 @@
-import { Databases } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 export class SettingsService {
   /**
@@ -9,20 +8,13 @@ export class SettingsService {
    */
   static async getSettings(sessionSecret: string, userId?: string) {
     if (userId) {
-      const databases = new Databases(createAdminClient());
-      return await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      return await servicesContainer.getDatabaseService().getDocument(
         process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
         userId
       );
     }
 
-    const databases = new Databases(createSessionClient(sessionSecret));
-    const settings = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
-      []
-    );
+    const settings = await servicesContainer.getSessionDatabaseService(sessionSecret).listDocuments<any>(process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!);
     return settings.documents[0];
   }
 
@@ -33,21 +25,15 @@ export class SettingsService {
    */
   static async updateSettings(sessionSecret: string, data: any, userId?: string) {
     if (userId) {
-      const databases = new Databases(createAdminClient());
-      return await databases.updateDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      return await servicesContainer.getDatabaseService().updateDocument(
         process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
         userId,
         data
       );
     }
 
-    const databases = new Databases(createSessionClient(sessionSecret));
-    const settings = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
-      []
-    );
+    const db = servicesContainer.getSessionDatabaseService(sessionSecret);
+    const settings = await db.listDocuments<any>(process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!);
 
     if (!settings.documents || settings.documents.length === 0) {
       throw new Error("Settings document not found for the current user");
@@ -55,8 +41,7 @@ export class SettingsService {
 
     const settingsId = settings.documents[0].$id;
 
-    return await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+    return await db.updateDocument(
       process.env.NEXT_PUBLIC_APPWRITE_SETTINGS_COLLECTION_ID!,
       settingsId,
       data

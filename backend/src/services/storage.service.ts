@@ -1,5 +1,4 @@
-import { Storage } from "node-appwrite";
-import { createAdminClient } from "../../app";
+import { servicesContainer } from "../config/providers";
 
 const bucketId = () =>
   process.env.APPWRITE_STORAGE_BUCKET_ID ||
@@ -9,7 +8,11 @@ const bucketId = () =>
 export class StorageService {
   static async getFileView(fileId: string) {
     if (!bucketId()) throw new Error("Storage bucket is not configured.");
-    const storage = new Storage(createAdminClient());
-    return Buffer.from(await storage.getFileView(bucketId(), fileId));
+    return servicesContainer.getStorageService().getFileView(fileId);
+  }
+
+  static async getFile(fileId: string) {
+    if (!bucketId()) throw new Error("Storage bucket is not configured.");
+    return servicesContainer.getStorageService().getFile(fileId);
   }
 }

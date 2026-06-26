@@ -1,4 +1,3 @@
-import { Client, Account, Databases, Storage, Users } from "node-appwrite";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -30,85 +29,16 @@ app.use("/api/portal", portalRoutes);
 app.use("/api/storage", storageRoutes);
 
 export default app;
-const endpoint =
-  process.env.APPWRITE_ENDPOINT ||
-  process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ||
-  "https://cloud.appwrite.io/v1";
-
-const projectId =
-  process.env.APPWRITE_PROJECT_ID ||
-  process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!;
-const apiKey =
-  process.env.APPWRITE_API_KEY ||
-  process.env.NEXT_APPWRITE_KEY!;
-
-// Exported for diagnostics
-export const APPWRITE_ENDPOINT = endpoint;
-export const APPWRITE_PROJECT_ID = projectId;
-export const APPWRITE_API_KEY = apiKey;
-
-/**
- * Admin Client
- * Uses API Key
- * Can create users, query databases, etc.
- */
-export const createAdminClient = () => {
-  if (!projectId) {
-    console.error("Appwrite project id is not set (APPWRITE_PROJECT_ID / NEXT_PUBLIC_APPWRITE_PROJECT_ID)");
-  }
-  if (!apiKey) {
-    console.error("Appwrite API key is not set (APPWRITE_API_KEY / NEXT_APPWRITE_KEY)");
-  }
-  console.debug("Using Appwrite endpoint:", endpoint);
-  return new Client()
-    .setEndpoint(endpoint)
-    .setProject(projectId)
-    .setKey(apiKey);
-};
-
-/**
- * Session Client
- * Uses user session secret
- * Acts as logged-in user
- */
-export const createSessionClient = (sessionSecret: string) => {
-  return new Client()
-    .setEndpoint(endpoint)
-    .setProject(projectId)
-    .setSession(sessionSecret);
-};
-
-/**
- * Helper Factories
- */
-export const getAdminAccount = () => {
-  return new Account(createAdminClient());
-};
-
-export const getAdminDatabase = () => {
-  return new Databases(createAdminClient());
-};
-
-export const getAdminStorage = () => {
-  return new Storage(createAdminClient());
-};
-
-export const getAdminUsers = () => {
-  return new Users(createAdminClient());
-};
-
-export const getSessionAccount = (
-  sessionSecret: string
-) => {
-  return new Account(
-    createSessionClient(sessionSecret)
-  );
-};
-
-export const getSessionDatabase = (
-  sessionSecret: string
-) => {
-  return new Databases(
-    createSessionClient(sessionSecret)
-  );
-};
+export {
+  APPWRITE_API_KEY,
+  APPWRITE_ENDPOINT,
+  APPWRITE_PROJECT_ID,
+  createAdminClient,
+  createSessionClient,
+  getAdminAccount,
+  getAdminDatabase,
+  getAdminStorage,
+  getAdminUsers,
+  getSessionAccount,
+  getSessionDatabase,
+} from "./src/config/appwrite";

@@ -14,8 +14,8 @@ import {
   getStudentDirectory
 } from "@/lib/actions/student.actions";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
+import MentorSidebar from "@/components/MentorSidebar";
 import MeetingsTabClient from "@/components/MeetingsTabClient";
 import AcademicsManager from "@/components/AcademicsManager";
 import AchievementsManager from "@/components/AchievementsManager";
@@ -23,22 +23,14 @@ import MentorRosterExplorer from "@/components/MentorRosterExplorer";
 import MentorRosterCards from "@/components/MentorRosterCards";
 import HeaderSearchBar from "@/components/HeaderSearchBar";
 import MentorNotesEditor from "@/components/MentorNotesEditor";
-import StudentDirectoryTable from "@/components/StudentDirectoryTable";
+import StudentDirectoryTable, { type EnrichedStudent } from "@/components/StudentDirectoryTable";
 import { getFileViewUrl } from "@/lib/files";
-import type { NoticeRecord } from "@/types";
+import type { AcademicUploadRecord, AchievementRecord, Meeting, NoticeRecord, UserProfile } from "@/types";
 import { 
   Users, 
-  CalendarDays, 
-  CheckSquare, 
   Bell, 
   ChevronLeft, 
-  GraduationCap, 
-  UserCircle, 
-  Activity,
-  MapPin,
-  Phone,
-  FileText,
-  LayoutDashboard
+  FileText
 } from "lucide-react";
 
 export default async function MentorDashboardPage(props: { searchParams: Promise<{ tab?: string, id?: string, q?: string, meetingGroupId?: string }> }) {
@@ -57,7 +49,7 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     getPendingApprovals(user.$id)
   ]);
 
-  let studentDirectory: any[] = [];
+  let studentDirectory: EnrichedStudent[] = [];
   if (activeTab === "directory") {
     studentDirectory = await getStudentDirectory();
   }
@@ -69,11 +61,11 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     pendingApprovals.achievements.length;
 
   // Fetch specific student data if the mentor is viewing a profile OR logging a meeting
-  let selectedStudent = null;
-  let latestAcademicRecord = null;
-  let academicRecords: any[] = [];
-  let achievementRecords: any[] = [];
-  let mentorNote = null;
+  let selectedStudent: UserProfile | null = null;
+  let latestAcademicRecord: AcademicUploadRecord | null = null;
+  let academicRecords: AcademicUploadRecord[] = [];
+  let achievementRecords: AchievementRecord[] = [];
+  let mentorNote: { content?: string; collectionMissing?: boolean } | null = null;
   if ((activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements') && studentId) {
     if (activeTab === 'student-profile') {
       const [fetchedStudent, latAcad, noteRes, achRes] = await Promise.all([
@@ -122,196 +114,38 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   };
 
   const studentMeetings = selectedStudent 
-    ? (scheduledMeetings || []).filter((m: any) => m.studentId === selectedStudent.$id || m.studentName === selectedStudent.fullName)
+    ? (scheduledMeetings || []).filter((m: Meeting) => m.studentId === selectedStudent.$id || m.studentName === selectedStudent.fullName)
     : [];
   const totalMeetingsCount = studentMeetings.length;
 
   // Dynamic Header Logic
   let pageTitle = "Dashboard";
-  let pageDesc = "Overview of your mentees' performance, upcoming sessions, and recent activities.";
   if (activeTab === 'roster') {
     pageTitle = "My Mentees";
-    pageDesc = "Manage your assigned students and track their progress.";
   } else if (activeTab === 'notices') {
     pageTitle = "University Notices";
-    pageDesc = "Important updates and deadlines from the administration.";
   } else if (activeTab === 'meetings') {
     pageTitle = "Meetings";
-    pageDesc = "Schedule roster meetings and mark which mentees attended.";
   } else if (activeTab === 'student-profile' && selectedStudent) {
     pageTitle = "Student Dossier";
-    pageDesc = `Detailed academic and personal profile for ${selectedStudent.fullName}.`;
   } else if (activeTab === 'log-meeting' && selectedStudent) {
     pageTitle = "Log Mentorship Session";
-    pageDesc = `Record a new meeting with ${selectedStudent.fullName}.`;
   } else if (activeTab === 'student-academics' && selectedStudent) {
     pageTitle = "Academic History";
-    pageDesc = `Academic records submitted by ${selectedStudent.fullName}.`;
   } else if (activeTab === 'student-achievements' && selectedStudent) {
     pageTitle = "Achievements";
-    pageDesc = `Achievement records submitted by ${selectedStudent.fullName}.`;
   } else if (activeTab === 'directory') {
     pageTitle = "Student Directory";
-    pageDesc = "View all students across the portal along with their assigned mentors and contact information.";
   }
 
-  const isRosterActive = activeTab === 'roster' || activeTab === 'student-profile' || activeTab === 'log-meeting' || activeTab === 'student-academics' || activeTab === 'student-achievements';
+  const activeSidebarItem =
+    activeTab === "meetings" || activeTab === "directory" || activeTab === "notices" || activeTab === "dashboard"
+      ? activeTab
+      : "roster";
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-slate-200 selection:text-slate-900">
-      
-      {/* ================= FULL-HEIGHT SIDEBAR ================= */}
-      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-64 flex-col bg-[#1A1A24] text-white md:flex animate-in fade-in duration-300">
-        
-        {/* BRANDING LOGO */}
-        <div className="flex h-24 shrink-0 items-center justify-center border-b border-white/5 px-6">
-          <img src="/pdeu_logo.png" alt="PDEU Logo" className="h-14 w-auto object-contain" />
-        </div>
-
-        {/* NAVIGATION */}
-        <nav className="flex-1 overflow-y-auto py-6 pl-4 pr-0 space-y-1.5">
-          <Link 
-            href="?tab=dashboard" 
-            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
-              activeTab === 'dashboard' 
-                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
-                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
-            }`}
-          >
-            <span>Dashboard</span>
-            {activeTab === 'dashboard' && (
-              <>
-                {/* Top curve */}
-                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-                </div>
-                {/* Bottom curve */}
-                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-                </div>
-              </>
-            )}
-          </Link>
-
-          <Link 
-            href="?tab=roster" 
-            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
-              isRosterActive 
-                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
-                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
-            }`}
-          >
-            <span>My Mentees</span>
-            {isRosterActive && (
-              <>
-                {/* Top curve */}
-                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-                </div>
-                {/* Bottom curve */}
-                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-                </div>
-              </>
-            )}
-          </Link>
-
-          <Link 
-            href="?tab=meetings" 
-            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
-              activeTab === 'meetings' 
-                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
-                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
-            }`}
-          >
-            <span>Meetings</span>
-            {activeTab === 'meetings' && (
-              <>
-                {/* Top curve */}
-                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-                </div>
-                {/* Bottom curve */}
-                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-                </div>
-              </>
-            )}
-          </Link>
-
-          <Link 
-            href="?tab=directory" 
-            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
-              activeTab === 'directory' 
-                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
-                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
-            }`}
-          >
-            <span>Student Directory</span>
-            {activeTab === 'directory' && (
-              <>
-                {/* Top curve */}
-                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-                </div>
-                {/* Bottom curve */}
-                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-                </div>
-              </>
-            )}
-          </Link>
-
-          <Link 
-            href="/mentor-dashboard/approvals" 
-            className="group flex items-center justify-between py-3 transition-all duration-200 text-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4"
-          >
-            <span>Pending Approvals</span>
-            {pendingApprovalCount > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-sm mr-2 animate-pulse">
-                {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
-              </span>
-            )}
-          </Link>
-
-          <Link 
-            href="?tab=notices" 
-            className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
-              activeTab === 'notices' 
-                ? 'font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0' 
-                : 'font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-full mr-4 px-4'
-            }`}
-          >
-            <span>Global Notices</span>
-            {activeTab === 'notices' && (
-              <>
-                {/* Top curve */}
-                <div className="absolute right-0 -top-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-br-full bg-[#1A1A24]" />
-                </div>
-                {/* Bottom curve */}
-                <div className="absolute right-0 -bottom-4 w-4 h-4 bg-[#F8FAFC] pointer-events-none">
-                  <div className="w-full h-full rounded-tr-full bg-[#1A1A24]" />
-                </div>
-              </>
-            )}
-          </Link>
-        </nav>
-        
-        {/* USER PROFILE & LOGOUT */}
-        <div className="p-4 border-t border-white/5 bg-transparent">
-           <div className="flex items-center gap-3 px-2 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white shadow-sm">
-                {user.name ? user.name.charAt(0).toUpperCase() : "M"}
-              </div>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold text-white">{user.name || "Faculty Member"}</span>
-                <span className="truncate text-xs text-slate-400 font-medium">Mentor Account</span>
-              </div>
-           </div>
-           <div className="px-1"><LogoutButton variant="sidebar-dark" /></div>
-        </div>
-      </aside>
+      <MentorSidebar activeItem={activeSidebarItem} pendingApprovalCount={pendingApprovalCount} userName={user.name} />
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="min-h-screen p-6 lg:p-10 md:ml-64">
@@ -572,7 +406,7 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
                     <form action={async () => {
                       "use server";
                       const { toggleStudentVerification } = await import("@/lib/actions/student.actions");
-                      await toggleStudentVerification(selectedStudent.$id, selectedStudent.isVerified);
+                            await toggleStudentVerification(selectedStudent.$id, Boolean(selectedStudent.isVerified));
                     }}>
                       <button 
                         type="submit" 

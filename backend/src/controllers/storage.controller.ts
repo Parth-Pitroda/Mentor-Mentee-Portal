@@ -5,11 +5,18 @@ import { StorageService } from "../services/storage.service";
 export class StorageController {
   static async view(req: AuthRequest, res: Response) {
     try {
-      const file = await StorageService.getFileView(String(req.params.fileId));
+      const file = await StorageService.getFile(String(req.params.fileId));
       res.setHeader("Cache-Control", "private, max-age=300");
-      return res.send(file);
+      res.setHeader("Content-Type", file.mimeType);
+      res.setHeader("Content-Length", String(file.buffer.length));
+      res.setHeader("Content-Disposition", `${req.query.download === "1" ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`);
+      return res.send(file.buffer);
     } catch (error: any) {
       return res.status(404).json({ error: error.message || "File not found" });
     }
   }
+}
+
+function safeFileName(fileName: string) {
+  return fileName.replace(/["\r\n]/g, "_");
 }
