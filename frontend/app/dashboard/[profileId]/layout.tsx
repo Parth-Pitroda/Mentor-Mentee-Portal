@@ -3,12 +3,15 @@ import { getMenteeProfile, getProfileByEmail } from "@/lib/actions/student.actio
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import DashboardSidebarNav from "@/components/DashboardSidebarNav";
+import DashboardHeader from "@/components/DashboardHeader";
 
 type DashboardProfile = {
   $id: string;
   email?: string;
   role?: string;
   mentorId?: string;
+  fullName?: string;
+  isVerified?: boolean;
 };
 
 export const dynamic = "force-dynamic";
@@ -91,7 +94,10 @@ export default async function DashboardLayout({
       {/* ================= MAIN CONTENT AREA ================= */}
       <div className="flex min-h-screen flex-col md:ml-64">
         <main className="flex-1 p-6 lg:p-10">
-          {children}
+          <div className="max-w-6xl mx-auto">
+            <DashboardHeader user={{ name: user.name, email: user.email }} />
+            {children}
+          </div>
         </main>
       </div>
     </div>
