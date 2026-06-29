@@ -129,6 +129,10 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
+  const initials = user.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+    : "M";
+
   const pendingData = await getPendingApprovals(user.$id);
   const { meetings, meetingRequests, academics, achievements } = pendingData;
   const pendingApprovalCount = meetings.length + meetingRequests.length + academics.length + achievements.length;
@@ -149,7 +153,15 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-slate-950">Pending Approvals</h1>
             </div>
-            <NotificationBell />
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div 
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold shadow-sm border border-slate-200 select-none"
+                title={user.name || "Faculty Member"}
+              >
+                {initials}
+              </div>
+            </div>
           </div>
 
           <div className="mb-8 flex w-full flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-100 p-1.5 shadow-sm lg:w-fit">

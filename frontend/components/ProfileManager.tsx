@@ -43,21 +43,16 @@ export default function ProfileManager({ profileData, mentorName, isOwnProfile }
   return (
     <div className="space-y-8">
       {/* HEADER WITH EDIT BUTTON */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900 leading-tight">Mentorship Profile</h2>
-          <p className="text-slate-500 mt-1 font-medium">Personal details, academic department, and system status.</p>
-        </div>
-        
-        {isOwnProfile && !isEditing && (
+      {isOwnProfile && !isEditing && (
+        <div className="flex justify-end">
           <button 
             onClick={() => setIsEditing(true)}
             className="px-4 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors text-sm"
           >
             Edit Profile
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 

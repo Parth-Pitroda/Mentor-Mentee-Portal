@@ -22,10 +22,6 @@ export default async function AchievementsPage({
 
   return (
     <div className="animate-in fade-in duration-500">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-900 leading-tight">Extra-Curricular Achievements</h2>
-      </div>
-
       <AchievementsManager 
         initialRecords={achievements} 
         profileId={profileId} 

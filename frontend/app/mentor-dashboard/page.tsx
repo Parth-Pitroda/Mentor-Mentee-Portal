@@ -42,6 +42,10 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
   const user = await getLoggedInUser();
   if (!user) redirect("/sign-in");
 
+  const initials = user.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+    : "M";
+
   const [myMentees, notices, scheduledMeetings, pendingApprovals] = await Promise.all([
     getMentorRoster(user.$id),
     getLatestNotices(5),
@@ -188,6 +192,12 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
             <div className="mb-2 lg:mb-0 flex items-center gap-4">
               {(activeTab === 'roster' || (activeTab === 'meetings' && !meetingGroupId)) && <HeaderSearchBar />}
               <NotificationBell />
+              <div 
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold shadow-sm border border-slate-200 select-none"
+                title={user.name || "Faculty Member"}
+              >
+                {initials}
+              </div>
             </div>
           </div>
           {/* ================= TAB 0: DASHBOARD ================= */}

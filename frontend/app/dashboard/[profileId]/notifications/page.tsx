@@ -68,11 +68,8 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
-        </div>
+    <div className="max-w-4xl mx-auto px-4">
+      <div className="flex justify-end mb-8">
         <div className="flex gap-3">
           <button
             onClick={() => setFilter("all")}
