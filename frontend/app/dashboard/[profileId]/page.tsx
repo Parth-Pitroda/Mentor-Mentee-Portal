@@ -330,9 +330,8 @@ export default async function DashboardOverviewPage({
 
             </div>
 
-            {/* RIGHT COLUMN: ASSIGNED MENTOR DETAILS */}
             <aside className="space-y-6">
-              <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-[0_4px_30px_rgba(0,0,0,0.015)] sticky top-8">
+              <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-[0_4px_30px_rgba(0,0,0,0.015)]">
                 <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
                   <UserCircle className="w-5 h-5 text-slate-400" />
                   <p className="text-xs font-black uppercase tracking-widest text-slate-800">Assigned Mentor</p>
