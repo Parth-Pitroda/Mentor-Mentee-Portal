@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestMeeting } from "@/lib/actions/student.actions";
 
-export default function MeetingRequestForm({ profileId }: { profileId: string }) {
+export default function MeetingRequestForm({ profileId, openByDefault = false, onSuccess }: { profileId: string; openByDefault?: boolean; onSuccess?: () => void }) {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(openByDefault);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,9 +20,10 @@ export default function MeetingRequestForm({ profileId }: { profileId: string })
 
     if (result.success) {
       form.reset();
-      setIsOpen(false);
+      setIsOpen(openByDefault);
       router.refresh();
       setIsSubmitting(false);
+      if (onSuccess) onSuccess();
       return;
     }
 
@@ -31,7 +32,7 @@ export default function MeetingRequestForm({ profileId }: { profileId: string })
   };
 
   return (
-    <div className="mt-5 border-t border-slate-200 pt-5">
+    <div className={openByDefault ? "" : "mt-5 border-t border-slate-200 pt-5"}>
       {!isOpen ? (
         <button
           type="button"
@@ -91,7 +92,7 @@ export default function MeetingRequestForm({ profileId }: { profileId: string })
             <button
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                setIsOpen(openByDefault);
                 setError("");
               }}
               className="px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-100 transition-colors"
