@@ -9,7 +9,8 @@ export class StorageController {
       res.setHeader("Cache-Control", "private, max-age=300");
       res.setHeader("Content-Type", file.mimeType);
       res.setHeader("Content-Length", String(file.buffer.length));
-      res.setHeader("Content-Disposition", `${req.query.download === "1" ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`);
+      const isDownload = req.query.download === "1" || req.query.download === "true";
+      res.setHeader("Content-Disposition", `${isDownload ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`);
       return res.send(file.buffer);
     } catch (error: any) {
       return res.status(404).json({ error: error.message || "File not found" });

@@ -6,13 +6,13 @@ const bucketId = () =>
   "";
 
 export class StorageService {
-  static async getFileView(fileId: string) {
-    if (!bucketId()) throw new Error("Storage bucket is not configured.");
-    return servicesContainer.getStorageService().getFileView(fileId);
-  }
-
   static async getFile(fileId: string) {
     if (!bucketId()) throw new Error("Storage bucket is not configured.");
     return servicesContainer.getStorageService().getFile(fileId);
+  }
+
+  static async getFileView(fileId: string) {
+    if (!bucketId()) throw new Error("Storage bucket is not configured.");
+    return servicesContainer.getStorageService().getFileView(fileId);
   }
 }
