@@ -133,10 +133,12 @@ export default function ProfileManager({ profileData, mentorName, isOwnProfile }
                   <p className="text-xs text-slate-500 font-bold uppercase mb-1">Department</p>
                   <p className="text-slate-800 font-medium">{profileData.department || "Not Specified"}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-bold uppercase mb-1">Primary Mentor</p>
-                  <p className="text-blue-700 font-medium">{mentorName}</p>
-                </div>
+                {profileData.role !== "mentor" && (
+                  <div>
+                    <p className="text-xs text-slate-500 font-bold uppercase mb-1">Primary Mentor</p>
+                    <p className="text-blue-700 font-medium">{mentorName}</p>
+                  </div>
+                )}
               </div>
             </div>
 

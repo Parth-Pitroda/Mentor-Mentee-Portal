@@ -2,7 +2,7 @@ import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 
 type MentorSidebarProps = {
-  activeItem: "dashboard" | "roster" | "meetings" | "directory" | "approvals" | "notices";
+  activeItem: "dashboard" | "roster" | "meetings" | "directory" | "approvals" | "notices" | "profile";
   pendingApprovalCount?: number;
   userName?: string;
   showUserDetails?: boolean;
@@ -15,6 +15,7 @@ const navItems = [
   { key: "directory", label: "Student Directory", href: "/mentor-dashboard?tab=directory" },
   { key: "approvals", label: "Pending Approvals", href: "/mentor-dashboard/approvals" },
   { key: "notices", label: "Global Notices", href: "/mentor-dashboard?tab=notices" },
+  { key: "profile", label: "My Profile", href: "/mentor-dashboard?tab=profile" },
 ] as const;
 
 function ActiveCurves() {
