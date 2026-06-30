@@ -29,6 +29,8 @@ export default function DashboardHeader({ profileId, user }: DashboardHeaderProp
     pageTitle = "Achievements";
   } else if (suffix === "notifications") {
     pageTitle = "Notifications";
+  } else if (suffix === "my-profile") {
+    pageTitle = "My Profile";
   } else if (suffix === "profile") {
     pageTitle = "Mentor's Profile";
   }

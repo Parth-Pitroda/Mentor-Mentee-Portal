@@ -10,6 +10,7 @@ const navItems = [
   { label: "Academic Records", suffix: "/academics" },
   { label: "Achievements", suffix: "/achievements" },
   { label: "Notifications", suffix: "/notifications", showUnread: true },
+  { label: "My Profile", suffix: "/my-profile" },
   { label: "Mentor's Profile", suffix: "/profile" },
 ];
 
