@@ -7,6 +7,30 @@ import { useRouter } from "next/navigation";
 import { getFileViewUrl } from "@/lib/files";
 import type { AchievementRecord } from "@/types";
 
+function parseAchievementCategory(record: AchievementRecord) {
+  const desc = record.description || "";
+  if (desc.startsWith("[Category: ")) {
+    const match = desc.match(/^\[Category: ([^\]]+)\]/);
+    if (match) {
+      const cat = match[1];
+      if (desc.includes("[Explanation: ")) {
+        const expMatch = desc.match(/\[Explanation: ([^\]]+)\]/);
+        if (expMatch) return `${cat} (${expMatch[1]})`;
+      }
+      return cat;
+    }
+  }
+  return record.category;
+}
+
+function parseAchievementDescription(record: AchievementRecord) {
+  const desc = record.description || "";
+  return desc
+    .replace(/^\[Category: [^\]]+\]\n?/, "")
+    .replace(/^\[Explanation: [^\]]+\]\n?/, "")
+    .trim();
+}
+
 type AchievementsManagerProps = {
   initialRecords: AchievementRecord[];
   profileId: string;
@@ -17,6 +41,7 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [category, setCategory] = useState("");
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,9 +49,30 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
     setError("");
 
     const formData = new FormData(e.currentTarget);
+    const selectedCat = formData.get("category") as string;
+    const originalDesc = formData.get("description") as string;
+
+    // Database supported Enum values are strictly ["Hackathon", "Internship", "Competitive Exam"]
+    const dbSupported = ["Hackathon", "Internship", "Competitive Exam"];
+
+    if (!dbSupported.includes(selectedCat)) {
+      // Map it to a valid enum option so Appwrite accepts it
+      formData.set("category", "Competitive Exam");
+      
+      if (selectedCat === "Other") {
+        const explanation = formData.get("explanation") as string;
+        formData.set("description", `[Category: Other]\n[Explanation: ${explanation}]\n\n${originalDesc}`);
+      } else {
+        formData.set("description", `[Category: ${selectedCat}]\n\n${originalDesc}`);
+      }
+    } else {
+      formData.set("description", originalDesc);
+    }
+
     const result = await uploadAchievement(formData, profileId);
 
     if (result.success) {
+      setCategory(""); // Reset category dropdown
       router.refresh();
     } else {
       setError(result.error);
@@ -56,16 +102,37 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
-                <select required name="category" className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
+                <select 
+                  required 
+                  name="category" 
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="">Select Category...</option>
                   <option value="Hackathon">Hackathon</option>
                   <option value="Internship">Internship</option>
-                  <option value="Exam">Exam (GATE, CAT, etc.)</option>
+                  <option value="Competitive Exam">Competitive Exam (GATE, CAT, etc.)</option>
                   <option value="Certification">Certification</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
             </div>
+
+            {category === "Other" && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                  Specify Category Explanation <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  required 
+                  name="explanation" 
+                  type="text" 
+                  className="w-full rounded-lg border border-slate-200 bg-white p-2.5 outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="e.g. Research Paper Publication, Community Service" 
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description / Details</label>
@@ -106,10 +173,10 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
                   <tr key={record.$id} className="hover:bg-slate-50/50">
                     <td className="px-6 py-4">
                       <p className="font-bold text-slate-700">{record.title}</p>
-                      <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">{record.category}</p>
+                      <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">{parseAchievementCategory(record)}</p>
                     </td>
-                    <td className="px-6 py-4 text-slate-600 max-w-xs truncate" title={record.description}>
-                      {record.description}
+                    <td className="px-6 py-4 text-slate-600 max-w-xs truncate" title={parseAchievementDescription(record)}>
+                      {parseAchievementDescription(record)}
                     </td>
                     <td className="px-6 py-4">
                       {record.fileId ? (
