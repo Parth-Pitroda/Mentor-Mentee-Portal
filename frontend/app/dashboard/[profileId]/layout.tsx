@@ -12,6 +12,7 @@ type DashboardProfile = {
   mentorId?: string;
   fullName?: string;
   isVerified?: boolean;
+  rollNo?: string;
 };
 
 export const dynamic = "force-dynamic";
@@ -95,7 +96,14 @@ export default async function DashboardLayout({
       <div className="flex min-h-screen flex-col md:ml-64">
         <main className="flex-1 p-6 lg:p-10">
           <div className="max-w-6xl mx-auto">
-            <DashboardHeader user={{ name: user.name, email: user.email }} />
+            <DashboardHeader 
+              profileId={profileId}
+              user={{ 
+                name: currentProfile?.fullName || user.name, 
+                email: user.email, 
+                rollNo: currentProfile?.rollNo 
+              }} 
+            />
             {children}
           </div>
         </main>
