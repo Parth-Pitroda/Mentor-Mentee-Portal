@@ -11,7 +11,8 @@ import {
   getAchievementRecordsForProfile, 
   getPendingApprovals,
   getMentorNote,
-  getStudentDirectory
+  getStudentDirectory,
+  getProfileByEmail
 } from "@/lib/actions/student.actions";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
@@ -24,6 +25,7 @@ import MentorRosterCards from "@/components/MentorRosterCards";
 import HeaderSearchBar from "@/components/HeaderSearchBar";
 import MentorNotesEditor from "@/components/MentorNotesEditor";
 import StudentDirectoryTable, { type EnrichedStudent } from "@/components/StudentDirectoryTable";
+import ProfileManager from "@/components/ProfileManager";
 import { getFileViewUrl } from "@/lib/files";
 import type { AcademicUploadRecord, AchievementRecord, Meeting, NoticeRecord, UserProfile } from "@/types";
 import { 
@@ -46,11 +48,12 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     ? user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
     : "M";
 
-  const [myMentees, notices, scheduledMeetings, pendingApprovals] = await Promise.all([
+  const [myMentees, notices, scheduledMeetings, pendingApprovals, mentorProfile] = await Promise.all([
     getMentorRoster(user.$id),
     getLatestNotices(5),
     getMentorScheduledMeetings(user.$id),
-    getPendingApprovals(user.$id)
+    getPendingApprovals(user.$id),
+    getProfileByEmail(user.email)
   ]);
 
   let studentDirectory: EnrichedStudent[] = [];
@@ -140,10 +143,12 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
     pageTitle = "Achievements";
   } else if (activeTab === 'directory') {
     pageTitle = "Student Directory";
+  } else if (activeTab === 'profile') {
+    pageTitle = "Faculty Profile";
   }
 
   const activeSidebarItem =
-    activeTab === "meetings" || activeTab === "directory" || activeTab === "notices" || activeTab === "dashboard"
+    activeTab === "meetings" || activeTab === "directory" || activeTab === "notices" || activeTab === "dashboard" || activeTab === "profile"
       ? activeTab
       : "roster";
 
@@ -189,14 +194,35 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
               </h1>
             </div>
             
-            <div className="mb-2 lg:mb-0 flex items-center gap-4">
-              {(activeTab === 'roster' || (activeTab === 'meetings' && !meetingGroupId)) && <HeaderSearchBar />}
-              <NotificationBell />
-              <div 
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold shadow-sm border border-slate-200 select-none"
-                title={user.name || "Faculty Member"}
-              >
-                {initials}
+            <div className="mb-2 lg:mb-0 flex items-center justify-between sm:justify-end gap-4 w-full lg:w-auto">
+              {(activeTab === 'roster' || (activeTab === 'meetings' && !meetingGroupId)) && (
+                <div className="flex-1 max-w-xs min-w-[140px]">
+                  <HeaderSearchBar />
+                </div>
+              )}
+              <div className="flex shrink-0 items-center gap-3">
+                <NotificationBell />
+                {/* Profile initials picture + Faculty Name & Designation Capsule */}
+                <Link 
+                  href="?tab=profile"
+                  className="flex shrink-0 items-center gap-2.5 bg-slate-50/60 pl-2 pr-3.5 py-1.5 rounded-xl border border-slate-200/50 hover:bg-slate-100/50 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer select-none"
+                  title="View faculty profile"
+                >
+                  {/* Initials Circle */}
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white text-[10px] font-black shadow-sm">
+                    {initials}
+                  </div>
+                  
+                  {/* Name & Role Text */}
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-slate-800 leading-tight">
+                      {user.name || "Faculty Mentor"}
+                    </p>
+                    <p className="text-[10px] font-medium text-slate-400 leading-none mt-0.5 uppercase tracking-wide">
+                      Faculty Mentor
+                    </p>
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -580,6 +606,81 @@ export default async function MentorDashboardPage(props: { searchParams: Promise
 
                 </form>
               </div>
+            </div>
+          )}
+
+          {/* ================= TAB 8: MENTOR'S OWN PROFILE ================= */}
+          {activeTab === 'profile' && mentorProfile && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-8 select-none" style={{ animationDelay: "100ms" }}>
+              
+              {/* --- MAIN GRID SECTION --- */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-start">
+                
+                {/* --- LEFT SECTION: GENERAL TEXT DETAILS --- */}
+                <div className="md:col-span-2 space-y-8">
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-850 mb-5 border-b border-slate-200 pb-2">Profile Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Full Name</span>
+                        <span className="text-slate-900 font-extrabold">{mentorProfile.fullName || user.name}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">University Email</span>
+                        <span className="text-slate-900 font-extrabold">{mentorProfile.email || user.email}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Role</span>
+                        <span className="text-slate-900 font-extrabold uppercase tracking-wide">Faculty Mentor</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Department</span>
+                        <span className="text-slate-900 font-extrabold">{mentorProfile.department || "Unassigned"}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200/80 text-sm sm:col-span-2">
+                        <span className="text-slate-500 text-xs font-bold tracking-wider uppercase">Technical Interests / Skills</span>
+                        <div className="flex flex-wrap justify-end gap-1.5 max-w-[70%]">
+                          {mentorProfile.skills && mentorProfile.skills.length > 0 ? (
+                            mentorProfile.skills.map((skill: string, index: number) => (
+                              <span key={index} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200/85">
+                                {skill}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">No interests specified</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- RIGHT SECTION: BIG IMAGE, DETAILS & ACTION (Borderless) --- */}
+                <div className="md:col-span-1 space-y-4 md:border-l md:border-slate-100 md:pl-10">
+                  <div className="w-full h-80 rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 text-white text-5xl font-black">
+                      {initials}
+                    </div>
+                  </div>
+
+                  {/* Mentor Details under the photo */}
+                  <div className="space-y-1.5 pt-2 select-none">
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{mentorProfile.fullName || user.name}</h2>
+                    <div className="flex flex-col gap-1 text-slate-555 text-xs font-semibold">
+                      <p>Designation : <b className="text-slate-800 font-bold">Faculty Mentor</b></p>
+                      <p>Department : <b className="text-slate-800 font-bold">{mentorProfile.department || "Unassigned"}</b></p>
+                      <div className="pt-1">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded font-bold uppercase text-[9px] tracking-wider border bg-emerald-50 border-emerald-100 text-emerald-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Active Faculty
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
             </div>
           )}
 

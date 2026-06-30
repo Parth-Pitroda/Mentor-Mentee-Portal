@@ -41,6 +41,10 @@ export default async function MentorStudentDetailPage(props: { params: Promise<{
     return name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
+  const initials = user.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+    : "M";
+
   const studentMeetings = (scheduledMeetings || []).filter((m: Meeting) => m.studentId === student.$id || m.studentName === student.fullName);
   const totalMeetingsCount = studentMeetings.length;
 
@@ -55,9 +59,27 @@ export default async function MentorStudentDetailPage(props: { params: Promise<{
         <header className="h-24 shrink-0 bg-transparent px-6 lg:px-10 flex items-center justify-between select-none">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Student Profile</h1>
           <div className="flex items-center gap-4">
-            <div className="h-9 w-9 rounded-full border border-slate-200 text-slate-650 flex items-center justify-center font-bold text-sm bg-white shadow-sm cursor-default select-none animate-in fade-in duration-300">
-              {user.name ? user.name.charAt(0).toUpperCase() : "M"}
-            </div>
+            {/* Profile initials picture + Faculty Name & Designation Capsule */}
+            <Link 
+              href="/mentor-dashboard?tab=profile"
+              className="flex items-center gap-2.5 bg-slate-50/60 pl-2 pr-3.5 py-1.5 rounded-xl border border-slate-200/50 hover:bg-slate-100/50 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer select-none"
+              title="View faculty profile"
+            >
+              {/* Initials Circle */}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white text-[10px] font-black shadow-sm">
+                {initials}
+              </div>
+              
+              {/* Name & Role Text */}
+              <div className="text-left">
+                <p className="text-xs font-bold text-slate-800 leading-tight">
+                  {user.name || "Faculty Mentor"}
+                </p>
+                <p className="text-[10px] font-medium text-slate-400 leading-none mt-0.5 uppercase tracking-wide">
+                  Faculty Mentor
+                </p>
+              </div>
+            </Link>
           </div>
         </header>
 

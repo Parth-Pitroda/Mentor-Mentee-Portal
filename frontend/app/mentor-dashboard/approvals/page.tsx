@@ -40,6 +40,30 @@ type AchievementApprovalRecord = AchievementRecord & {
   studentId: string;
 };
 
+function parseCategory(desc?: string, fallbackCategory?: string) {
+  const text = desc || "";
+  if (text.startsWith("[Category: ")) {
+    const match = text.match(/^\[Category: ([^\]]+)\]/);
+    if (match) {
+      const cat = match[1];
+      if (text.includes("[Explanation: ")) {
+        const expMatch = text.match(/\[Explanation: ([^\]]+)\]/);
+        if (expMatch) return `${cat} (${expMatch[1]})`;
+      }
+      return cat;
+    }
+  }
+  return fallbackCategory || "Achievement";
+}
+
+function parseDescription(desc?: string) {
+  const text = desc || "";
+  return text
+    .replace(/^\[Category: [^\]]+\]\n?/, "")
+    .replace(/^\[Explanation: [^\]]+\]\n?/, "")
+    .trim();
+}
+
 function getInitials(name?: string) {
   return (name || "Student")
     .split(" ")
@@ -155,12 +179,27 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
             </div>
             <div className="flex items-center gap-4">
               <NotificationBell />
-              <div 
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold shadow-sm border border-slate-200 select-none"
-                title={user.name || "Faculty Member"}
+              {/* Profile initials picture + Faculty Name & Designation Capsule */}
+              <Link 
+                href="/mentor-dashboard?tab=profile"
+                className="flex items-center gap-2.5 bg-slate-50/60 pl-2 pr-3.5 py-1.5 rounded-xl border border-slate-200/50 hover:bg-slate-100/50 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer select-none"
+                title="View faculty profile"
               >
-                {initials}
-              </div>
+                {/* Initials Circle */}
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white text-[10px] font-black shadow-sm">
+                  {initials}
+                </div>
+                
+                {/* Name & Role Text */}
+                <div className="text-left">
+                  <p className="text-xs font-bold text-slate-800 leading-tight">
+                    {user.name || "Faculty Mentor"}
+                  </p>
+                  <p className="text-[10px] font-medium text-slate-400 leading-none mt-0.5 uppercase tracking-wide">
+                    Faculty Mentor
+                  </p>
+                </div>
+              </Link>
             </div>
           </div>
 
@@ -334,7 +373,7 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                               </div>
                             </div>
                             <span className="rounded-lg border border-purple-100 bg-purple-50 px-2.5 py-1 text-[10px] font-bold text-purple-700">
-                              {ach.category}
+                              {parseCategory(ach.description, ach.category)}
                             </span>
                           </div>
 
@@ -343,7 +382,7 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                               <Award className="h-3 w-3" />
                               {ach.title}
                             </span>
-                            <p className="text-xs font-semibold leading-relaxed text-slate-600">{ach.description || "No description submitted."}</p>
+                            <p className="text-xs font-semibold leading-relaxed text-slate-600">{parseDescription(ach.description) || "No description submitted."}</p>
                           </div>
                         </div>
 
