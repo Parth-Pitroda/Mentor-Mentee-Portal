@@ -1,9 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
-
 export function getFileViewUrl(fileId: string) {
-  return `${API_URL}/storage/files/${encodeURIComponent(fileId)}/view`;
+  return `/api/files/${encodeURIComponent(fileId)}`;
 }
 
 export function getFileDownloadUrl(fileId: string) {
-  return `${getFileViewUrl(fileId)}?download=1`;
+  return `/api/files/${encodeURIComponent(fileId)}?download=1`;
 }

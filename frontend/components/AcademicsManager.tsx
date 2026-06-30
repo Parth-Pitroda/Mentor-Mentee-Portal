@@ -39,9 +39,7 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
   // Sub-navigation view: "dashboard" or "upload"
   const [activeView, setActiveView] = useState<"dashboard" | "upload">("dashboard");
 
-  // State for inline document preview modal
-  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
-  const [previewSemester, setPreviewSemester] = useState<number | null>(null);
+
 
   // Safety client mount check to prevent SSR hydration warnings from Recharts
   useEffect(() => {
@@ -241,15 +239,14 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
                         </td>
                         <td className="px-6 py-4.5">
                           {record.fileId ? (
-                            <button 
-                              onClick={() => {
-                                setPreviewFileId(record.fileId || null);
-                                setPreviewSemester(Number(record.semester));
-                              }}
+                            <a 
+                              href={getFileViewUrl(record.fileId)} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
                               className="text-blue-600 hover:underline font-extrabold text-left cursor-pointer"
                             >
                               📄 View File
-                            </button>
+                            </a>
                           ) : (
                             <span className="text-slate-400 italic">No File</span>
                           )}
@@ -387,48 +384,7 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
         </div>
       )}
 
-      {/* ================= INLINE QUICK PREVIEW MODAL ================= */}
-      {previewFileId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <div>
-                <h4 className="font-extrabold text-slate-900 text-sm md:text-base">Document Preview</h4>
-                <p className="text-xs font-bold text-slate-500 mt-0.5">Semester {previewSemester} Marksheet</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <a 
-                  href={getFileDownloadUrl(previewFileId)} 
-                  download={`Semester_${previewSemester}_Marksheet`}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
-                >
-                  Download
-                </a>
-                <button 
-                  onClick={() => {
-                    setPreviewFileId(null);
-                    setPreviewSemester(null);
-                  }}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Modal Content Iframe */}
-            <div className="flex-1 bg-slate-50 relative">
-              <iframe 
-                src={getFileViewUrl(previewFileId)} 
-                className="w-full h-full border-none"
-                title={`Semester ${previewSemester} Marksheet Preview`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );
