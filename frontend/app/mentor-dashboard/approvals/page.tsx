@@ -1,18 +1,13 @@
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
-import { 
-  getPendingApprovals, 
-  respondToMeetingRequest,
-  updateMeetingStatus, 
-  updateAcademicStatus, 
-  updateAchievementStatus
-} from "@/lib/actions/student.actions";
+import { getPendingApprovals } from "@/lib/actions/student.actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
 import MentorSidebar from "@/components/MentorSidebar";
-import { getFileViewUrl } from "@/lib/files";
+import ApprovalCardActions from "@/components/ApprovalCardActions";
 import type { AcademicUploadRecord, AchievementRecord, Meeting } from "@/types";
-import { Award, BookOpen, CalendarClock, Check, Eye, Inbox, X } from "lucide-react";
+import { Award, BookOpen, CalendarClock, Inbox } from "lucide-react";
+import { getFileViewUrl } from "@/lib/files";
 
 type ApprovalRecord = {
   $id: string;
@@ -101,49 +96,7 @@ function QueueHeader({ title }: { title: string }) {
   );
 }
 
-function ViewButton({ href, external = false }: { href: string; external?: boolean }) {
-  const className = "flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:scale-[1.02] hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]";
 
-  if (external) {
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
-        <Eye className="h-3.5 w-3.5" />
-        View
-      </a>
-    );
-  }
-
-  return (
-    <Link href={href} className={className}>
-      <Eye className="h-3.5 w-3.5" />
-      View
-    </Link>
-  );
-}
-
-function AcceptButton({ children = "Accept" }: { children?: string }) {
-  return (
-    <button
-      type="submit"
-      className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-[0.98]"
-    >
-      <Check className="h-3.5 w-3.5" />
-      {children}
-    </button>
-  );
-}
-
-function RejectButton() {
-  return (
-    <button
-      type="submit"
-      className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-600 transition-all hover:scale-[1.02] hover:bg-rose-100/50 active:scale-[0.98]"
-    >
-      <X className="h-3.5 w-3.5" />
-      Reject
-    </button>
-  );
-}
 
 // 1. Next.js 15 passes searchParams as a Promise to read URL queries!
 export default async function MentorApprovalsPage(props: { searchParams: Promise<{ tab?: string }> }) {
@@ -281,15 +234,18 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                          <ViewButton href={`/mentor-dashboard/student/${request.studentId}`} />
-                          <form action={async () => { "use server"; await respondToMeetingRequest(request.$id, "Confirmed"); }}>
-                            <AcceptButton />
-                          </form>
-                          <form action={async () => { "use server"; await respondToMeetingRequest(request.$id, "Rejected"); }}>
-                            <RejectButton />
-                          </form>
-                        </div>
+                        <ApprovalCardActions
+                          recordId={request.$id}
+                          studentId={request.studentId}
+                          studentName={request.studentName || "A mentee"}
+                          type="request"
+                          title={request.agenda || "Meeting Request"}
+                          description={request.agenda || request.description || "No agenda specified."}
+                          extraDetails={{
+                            proposedDate: request.proposedDate || request.date,
+                            proposedTime: request.proposedTime
+                          }}
+                        />
                       </div>
                     ))}
                   </div>
@@ -335,15 +291,20 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                          <ViewButton href={acad.fileId ? getFileUrl(acad.fileId) : `/mentor-dashboard/student/${acad.studentId}`} external={Boolean(acad.fileId)} />
-                          <form action={async () => { "use server"; await updateAcademicStatus(acad.$id, "Verified", acad.studentId); }}>
-                            <AcceptButton />
-                          </form>
-                          <form action={async () => { "use server"; await updateAcademicStatus(acad.$id, "Rejected", acad.studentId); }}>
-                            <RejectButton />
-                          </form>
-                        </div>
+                        <ApprovalCardActions
+                          recordId={acad.$id}
+                          studentId={acad.studentId}
+                          studentName={acad.studentName || "A mentee"}
+                          type="academic"
+                          fileId={acad.fileId}
+                          title={`Semester ${acad.semester} Gradesheet`}
+                          description={`Marksheet submission for Semester ${acad.semester}.`}
+                          extraDetails={{
+                            cpi: acad.cpi,
+                            spi: acad.spi,
+                            semester: acad.semester
+                          }}
+                        />
                       </div>
                     ))}
                   </div>
@@ -386,15 +347,15 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                          <ViewButton href={ach.fileId ? getFileUrl(ach.fileId) : `/mentor-dashboard/student/${ach.studentId}`} external={Boolean(ach.fileId)} />
-                          <form action={async () => { "use server"; await updateAchievementStatus(ach.$id, "Verified", ach.studentId); }}>
-                            <AcceptButton />
-                          </form>
-                          <form action={async () => { "use server"; await updateAchievementStatus(ach.$id, "Rejected", ach.studentId); }}>
-                            <RejectButton />
-                          </form>
-                        </div>
+                        <ApprovalCardActions
+                          recordId={ach.$id}
+                          studentId={ach.studentId}
+                          studentName={ach.studentName || "A mentee"}
+                          type="achievement"
+                          fileId={ach.fileId}
+                          title={ach.title || "Extracurricular Achievement"}
+                          description={parseDescription(ach.description)}
+                        />
                       </div>
                     ))}
                   </div>
@@ -437,15 +398,17 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                          <ViewButton href={`/mentor-dashboard/student/${meeting.studentId}`} />
-                          <form action={async () => { "use server"; await updateMeetingStatus(meeting.$id, "Verified", meeting.studentId); }}>
-                            <AcceptButton />
-                          </form>
-                          <form action={async () => { "use server"; await updateMeetingStatus(meeting.$id, "Rejected", meeting.studentId); }}>
-                            <RejectButton />
-                          </form>
-                        </div>
+                        <ApprovalCardActions
+                          recordId={meeting.$id}
+                          studentId={meeting.studentId}
+                          studentName={meeting.studentName || "A mentee"}
+                          type="meeting"
+                          title={meeting.topic || "Mentorship Session Notes"}
+                          description={meeting.description || "No description submitted."}
+                          extraDetails={{
+                            proposedDate: meeting.date
+                          }}
+                        />
                       </div>
                     ))}
                   </div>
