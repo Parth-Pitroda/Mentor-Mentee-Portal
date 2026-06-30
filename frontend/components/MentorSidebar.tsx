@@ -74,17 +74,6 @@ export default function MentorSidebar({
       </nav>
 
       <div className="p-4 border-t border-white/5 bg-transparent">
-        {showUserDetails && (
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white shadow-sm">
-              {userName ? userName.charAt(0).toUpperCase() : "M"}
-            </div>
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold text-white">{userName || "Faculty Member"}</span>
-              <span className="truncate text-xs text-slate-400 font-medium">Mentor Account</span>
-            </div>
-          </div>
-        )}
         <div className="px-1">
           <LogoutButton variant="sidebar-dark" />
         </div>
