@@ -80,7 +80,7 @@ export default function Sidebar({
               : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
           }`}
         >
-          Mentorship Profile
+          Mentor's Profile
         </Link>
       </nav>
 

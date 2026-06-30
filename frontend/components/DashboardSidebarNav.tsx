@@ -10,7 +10,7 @@ const navItems = [
   { label: "Academic Records", suffix: "/academics" },
   { label: "Achievements", suffix: "/achievements" },
   { label: "Notifications", suffix: "/notifications", showUnread: true },
-  { label: "Mentorship Profile", suffix: "/profile" },
+  { label: "Mentor's Profile", suffix: "/profile" },
 ];
 
 export default function DashboardSidebarNav({ profileId }: { profileId: string }) {

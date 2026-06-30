@@ -30,7 +30,7 @@ export default function DashboardHeader({ profileId, user }: DashboardHeaderProp
   } else if (suffix === "notifications") {
     pageTitle = "Notifications";
   } else if (suffix === "profile") {
-    pageTitle = "Mentorship Profile";
+    pageTitle = "Mentor's Profile";
   }
 
   const initials = user?.name
