@@ -124,7 +124,7 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
 
       {/* MAIN CONTENT AREA */}
       <main className="min-h-screen p-6 lg:p-10 md:ml-64">
-        <div className="max-w-5xl mx-auto">
+        <div className="w-full">
           
           <div className="mb-8 flex items-start justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
@@ -156,45 +156,57 @@ export default async function MentorApprovalsPage(props: { searchParams: Promise
             </div>
           </div>
 
-          <div className="mb-8 flex w-full flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-100 p-1.5 shadow-sm lg:w-fit">
+          <div className="mb-8 flex w-full gap-8 border-b border-slate-200/60 pb-px select-none overflow-x-auto scrollbar-none">
             <Link 
               href="?tab=requests" 
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`pb-3.5 text-sm font-semibold transition-all relative shrink-0 flex items-center gap-2 group ${activeTab === 'requests' ? 'text-slate-900 font-extrabold' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Meeting Requests
-              <span className={`text-xs py-0.5 px-2 rounded-full ${activeTab === 'requests' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>
+              <span>Meeting Requests</span>
+              <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-colors duration-200 ${activeTab === 'requests' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200/60'}`}>
                 {meetingRequests.length}
               </span>
+              {activeTab === 'requests' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900 rounded-full animate-in fade-in duration-300" />
+              )}
             </Link>
 
             <Link 
               href="?tab=academics" 
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === 'academics' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`pb-3.5 text-sm font-semibold transition-all relative shrink-0 flex items-center gap-2 group ${activeTab === 'academics' ? 'text-slate-900 font-extrabold' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Academics
-              <span className={`text-xs py-0.5 px-2 rounded-full ${activeTab === 'academics' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>
+              <span>Academics</span>
+              <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-colors duration-200 ${activeTab === 'academics' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200/60'}`}>
                 {academics.length}
               </span>
+              {activeTab === 'academics' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900 rounded-full animate-in fade-in duration-300" />
+              )}
             </Link>
             
             <Link 
               href="?tab=achievements" 
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === 'achievements' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`pb-3.5 text-sm font-semibold transition-all relative shrink-0 flex items-center gap-2 group ${activeTab === 'achievements' ? 'text-slate-900 font-extrabold' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Achievements
-              <span className={`text-xs py-0.5 px-2 rounded-full ${activeTab === 'achievements' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200 text-slate-500'}`}>
+              <span>Achievements</span>
+              <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-colors duration-200 ${activeTab === 'achievements' ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200/60'}`}>
                 {achievements.length}
               </span>
+              {activeTab === 'achievements' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900 rounded-full animate-in fade-in duration-300" />
+              )}
             </Link>
 
             <Link 
               href="?tab=meetings" 
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === 'meetings' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`pb-3.5 text-sm font-semibold transition-all relative shrink-0 flex items-center gap-2 group ${activeTab === 'meetings' ? 'text-slate-900 font-extrabold' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Meeting Logs
-              <span className={`text-xs py-0.5 px-2 rounded-full ${activeTab === 'meetings' ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-500'}`}>
+              <span>Meeting Logs</span>
+              <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-colors duration-200 ${activeTab === 'meetings' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200/60'}`}>
                 {meetings.length}
               </span>
+              {activeTab === 'meetings' && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900 rounded-full animate-in fade-in duration-300" />
+              )}
             </Link>
           </div>
 
