@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import { logoutUser } from "@/lib/actions/auth.actions";
 import { useState } from "react";
 import toast from "react-hot-toast";

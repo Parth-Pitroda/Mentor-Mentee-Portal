@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { updateMeetingStatus } from "@/lib/actions/student.actions";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import type { Meeting } from "@/types";
 import MeetingRequestForm from "./MeetingRequestForm";
 import { 

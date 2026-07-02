@@ -1,5 +1,5 @@
 {
-  "name": "mentor-portal-backend",
+  "name": "@mentor-portal/backend",
   "version": "0.1.0",
   "main": "server.ts",
   "scripts": {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import { scheduleMentorMeeting } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
 import { Calendar, Clock, Video, MapPin, Users, FileText, Search, Check, AlertCircle } from "lucide-react";

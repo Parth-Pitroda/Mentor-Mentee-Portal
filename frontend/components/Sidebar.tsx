@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "react-router-dom";
+import { usePathname } from "@/lib/router-compat";
 import LogoutButton from "@/components/LogoutButton"; // 1. Import your new button!
 
 export default function Sidebar({
@@ -31,7 +31,7 @@ export default function Sidebar({
       {/* Added overflow-y-auto so the links can scroll if on a small screen */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <Link
-          href={`/dashboard/${profileId}`}
+          to={`/dashboard/${profileId}`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}`)
               ? "bg-blue-50 text-blue-700"
@@ -41,7 +41,7 @@ export default function Sidebar({
           Dashboard
         </Link>
         <Link
-          href={`/dashboard/${profileId}/meetings`}
+          to={`/dashboard/${profileId}/meetings`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}/meetings`)
               ? "bg-blue-50 text-blue-700"
@@ -51,7 +51,7 @@ export default function Sidebar({
           Meeting Logs
         </Link>
         <Link
-          href={`/dashboard/${profileId}/academics`}
+          to={`/dashboard/${profileId}/academics`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}/academics`)
               ? "bg-blue-50 text-blue-700"
@@ -62,7 +62,7 @@ export default function Sidebar({
         </Link>
 
         <Link
-          href={`/dashboard/${profileId}/achievements`}
+          to={`/dashboard/${profileId}/achievements`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}/achievements`)
               ? "bg-blue-50 text-blue-700"
@@ -73,7 +73,7 @@ export default function Sidebar({
         </Link>
 
         <Link
-          href={`/dashboard/${profileId}/my-profile`}
+          to={`/dashboard/${profileId}/my-profile`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}/my-profile`)
               ? "bg-blue-50 text-blue-700"
@@ -84,7 +84,7 @@ export default function Sidebar({
         </Link>
 
         <Link
-          href={`/dashboard/${profileId}/profile`}
+          to={`/dashboard/${profileId}/profile`}
           className={`block px-4 py-2 rounded-lg transition-colors font-medium ${
             isActive(`/dashboard/${profileId}/profile`)
               ? "bg-blue-50 text-blue-700"

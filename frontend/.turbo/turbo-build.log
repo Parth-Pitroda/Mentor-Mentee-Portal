@@ -1,0 +1,21 @@
+
+> @mentor-portal/frontend@0.1.0 build /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend
+> tsc -b && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 3472 modules transformed.
+[plugin vite:reporter] 
+(!) /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/lib/actions/student.actions.ts is dynamically imported by /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MentorRosterExplorer.tsx but also statically imported by /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/AcademicsManager.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/AchievementsManager.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/AssignmentManager.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/BulkImportManager.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/DeleteUserButton.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MeetingRequestForm.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MeetingTableWrapper.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MeetingsTabClient.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MentorMeetingScheduler.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MentorNotesEditor.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/MentorScheduledMeetings.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/NotificationProvider.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/OnboardingWizard.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/ProfileManager.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/dashboard/AchievementsWidget.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/dashboard/MeetingsWidget.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/components/dashboard/NoticeBoard.tsx, /Users/daxpatel/Desktop/Mentor-Mentee-Portal/frontend/src/App.tsx, dynamic import will not move module into another chunk.
+
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.48 kB │ gzip:   0.30 kB
+dist/assets/index-Bs6kpmvj.css     84.78 kB │ gzip:  14.05 kB
+dist/assets/index-BvKgDqY-.js   1,051.49 kB │ gzip: 296.80 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.86s

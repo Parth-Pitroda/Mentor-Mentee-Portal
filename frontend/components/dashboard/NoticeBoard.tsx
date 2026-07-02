@@ -1,8 +1,26 @@
+import { useEffect, useState } from "react";
 import { getLatestNotices } from "@/lib/actions/student.actions";
 import type { NoticeRecord } from "@/types";
 
-export default async function NoticeBoard() {
-  const notices = await getLatestNotices();
+export default function NoticeBoard() {
+  const [notices, setNotices] = useState<NoticeRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    getLatestNotices()
+      .then((items) => {
+        if (active) setNotices(items as NoticeRecord[]);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 h-full flex flex-col">
@@ -16,12 +34,16 @@ export default async function NoticeBoard() {
       </div>
 
       <div className="p-4 overflow-y-auto max-h-[400px] space-y-4">
-        {notices.length === 0 ? (
+        {isLoading ? (
+          <p className="text-gray-400 text-center text-sm py-10 italic">
+            Loading notices...
+          </p>
+        ) : notices.length === 0 ? (
           <p className="text-gray-400 text-center text-sm py-10 italic">
             No new announcements today.
           </p>
         ) : (
-          (notices as NoticeRecord[]).map((notice) => (
+          notices.map((notice) => (
             <div
               key={notice.$id}
               className="border-l-4 border-blue-500 bg-gray-50 p-3 rounded-r-lg hover:bg-gray-100 transition-colors"

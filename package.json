@@ -1,9 +1,14 @@
 {
   "name": "mentor-portal-monorepo",
   "private": true,
-  "workspaces": [
-    "frontend",
-    "backend"
-  ]
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "turbo lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.6.3"
+  }
 }
-

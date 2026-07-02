@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "@/lib/router-compat";
 import { respondToMeetingRequest } from "@/lib/actions/student.actions";
 import MentorMeetingScheduler from "./MentorMeetingScheduler";
 import MentorScheduledMeetings from "./MentorScheduledMeetings";

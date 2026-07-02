@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { respondToMeetingRequest } from "@/lib/actions/student.actions";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 
 export default function MeetingActionButtons({ meetingId }: { meetingId: string }) {
   const router = useRouter();

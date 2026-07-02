@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import { requestMeeting } from "@/lib/actions/student.actions";
 
 export default function MeetingRequestForm({ profileId, openByDefault = false, onSuccess }: { profileId: string; openByDefault?: boolean; onSuccess?: () => void }) {

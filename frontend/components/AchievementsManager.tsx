@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { uploadAchievement, updateAchievementStatus } from "@/lib/actions/student.actions";
 import StyledFileInput from "@/components/StyledFileInput";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import { getFileViewUrl } from "@/lib/files";
 import type { AchievementRecord } from "@/types";
 

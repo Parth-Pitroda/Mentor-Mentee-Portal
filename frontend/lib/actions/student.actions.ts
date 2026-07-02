@@ -1,7 +1,4 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { serverApi } from "@/lib/api-server";
+import { api } from "@/lib/api-client";
 import type { AppData } from "@/types";
 
 type EncodedFile = {
@@ -12,17 +9,29 @@ type EncodedFile = {
 };
 
 async function portalAction<T = AppData>(action: string, payload: AppData = {}): Promise<T> {
-  return serverApi.post<T>("/portal/action", { action, payload });
+  return api.post<T>("/portal/action", { action, payload });
+}
+
+function revalidatePath(_path: string) {
+  window.dispatchEvent(new CustomEvent("app:refresh"));
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
 }
 
 async function encodeFile(file: File | null): Promise<EncodedFile | null> {
   if (!file || file.size === 0 || file.name === "undefined") return null;
-  const bytes = Buffer.from(await file.arrayBuffer());
   return {
     name: file.name,
     type: file.type,
     size: file.size,
-    base64: bytes.toString("base64"),
+    base64: arrayBufferToBase64(await file.arrayBuffer()),
   };
 }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { uploadAcademicRecord, updateAcademicStatus } from "@/lib/actions/student.actions";
 import StyledFileInput from "@/components/StyledFileInput";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "@/lib/router-compat"; 
 import { getFileViewUrl, getFileDownloadUrl } from "@/lib/files";
 import type { AcademicUploadRecord } from "@/types";
 import { 

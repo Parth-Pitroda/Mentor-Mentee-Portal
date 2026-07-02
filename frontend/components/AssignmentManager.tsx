@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { assignMentor } from "@/lib/actions/student.actions";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import type { UserProfile } from "@/types";
 
 type AssignmentManagerProps = {

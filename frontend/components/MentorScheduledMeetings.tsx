@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "@/lib/router-compat";
 import { updateScheduledMeetingAttendance, updateMeetingCommonPoints, updateMeetingStudentNotes } from "@/lib/actions/student.actions";
 import { getFileViewUrl } from "@/lib/files";
 import { Calendar, MapPin, Video, Clock, Users, Download, ExternalLink, Check, FileText, Trash2, Plus, Loader2, Search, ChevronRight, ChevronLeft, AlertCircle } from "lucide-react";
@@ -861,7 +861,7 @@ export default function MentorScheduledMeetings({ meetings }: { meetings: Schedu
                       >
                         <td className="py-3 px-4">
                           <Link
-                            href={`?tab=student-profile&id=${meeting.studentId}`}
+                            to={`?tab=student-profile&id=${meeting.studentId}`}
                             className="flex items-center gap-3 group"
                           >
                             <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center font-bold text-slate-755 overflow-hidden shrink-0 shadow-sm group-hover:border-blue-200">

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "@/lib/router-compat";
 import { Search } from "lucide-react";
 import { useTransition } from "react";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "react-router-dom";
+import { usePathname } from "@/lib/router-compat";
 import { useNotifications } from "@/components/NotificationProvider";
 
 const navItems = [
@@ -28,7 +28,7 @@ export default function DashboardSidebarNav({ profileId }: { profileId: string }
         return (
           <Link
             key={item.label}
-            href={href}
+            to={href}
             className={`group flex items-center justify-between py-3 transition-all duration-200 text-lg ${
               isActive
                 ? "font-bold bg-[#F8FAFC] text-slate-900 rounded-l-full rounded-r-none pl-6 pr-6 relative z-10 mr-0"

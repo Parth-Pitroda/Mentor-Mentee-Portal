@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useRouter } from "@/lib/router-compat";
 import { getFileViewUrl } from "@/lib/files";
 import { 
   Mail, 
@@ -277,7 +277,7 @@ export default function MentorRosterExplorer({
 
         {/* Metric 2: Pending Approvals */}
         <Link 
-          href="/mentor-dashboard/approvals"
+          to="/mentor-dashboard/approvals"
           className={`rounded-xl border p-5 shadow-sm flex items-center justify-between hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 select-none ${
             pendingApprovalCount > 0 
               ? "bg-amber-50/40 border-amber-200 text-amber-900" 
@@ -919,7 +919,7 @@ function ActionItemsCard({ mentees, meetings, pendingApprovalCount }: { mentees:
               />
               {task.type === "link" ? (
                 <Link 
-                  href="/mentor-dashboard/approvals" 
+                  to="/mentor-dashboard/approvals" 
                   className={`font-bold hover:underline transition-all ${isDone ? "line-through text-slate-400 font-semibold" : "text-amber-700 hover:text-amber-800"}`}
                 >
                   {task.label}

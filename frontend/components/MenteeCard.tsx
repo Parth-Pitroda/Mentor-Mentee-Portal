@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { getFileViewUrl } from "@/lib/files";
 
 export type MenteeCardStudent = {
@@ -28,7 +28,7 @@ export default function MenteeCard({ student, index = 0 }: { student: MenteeCard
 
   return (
     <Link 
-      href={`?tab=student-profile&id=${student.$id}`}
+      to={`?tab=student-profile&id=${student.$id}`}
       style={{ animationDelay: `${index * 45}ms` }}
       className="animate-fade-in-up group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-[0_12px_30px_rgba(59,130,246,0.08)] hover:-translate-y-1.5 transition-all duration-300"
     >

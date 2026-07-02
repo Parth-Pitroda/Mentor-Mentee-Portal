@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { useNotifications } from "@/components/NotificationProvider";
 
 export default function NotificationDropdown({ onClose }: { onClose: () => void }) {
@@ -110,7 +110,7 @@ export default function NotificationDropdown({ onClose }: { onClose: () => void 
                 }`}
               >
                 <Link
-                  href={getNotificationLink(n.type)}
+                  to={getNotificationLink(n.type)}
                   onClick={async () => {
                     await markAsRead(n.$id);
                     onClose();
@@ -148,7 +148,7 @@ export default function NotificationDropdown({ onClose }: { onClose: () => void 
               </div>
             ))}
             <Link
-              href={role === "mentor" ? "/mentor-dashboard/approvals" : profileId ? `/dashboard/${profileId}/notifications` : "/dashboard"}
+              to={role === "mentor" ? "/mentor-dashboard/approvals" : profileId ? `/dashboard/${profileId}/notifications` : "/dashboard"}
               onClick={onClose}
               className="p-3 text-center text-xs font-bold text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors border-t border-slate-100"
             >

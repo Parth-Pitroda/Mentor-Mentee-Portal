@@ -12,8 +12,20 @@ import storageRoutes from "./src/routes/storage.routes";
 
 const app = express();
 
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || "http://localhost:5173,http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: "15mb" }));

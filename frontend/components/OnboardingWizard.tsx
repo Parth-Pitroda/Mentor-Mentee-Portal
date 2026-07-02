@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router-compat";
 import { completeMenteeOnboarding } from "@/lib/actions/student.actions";
 
 export default function OnboardingWizard({ userId, userName, userEmail }: { userId: string, userName?: string, userEmail?: string }) {

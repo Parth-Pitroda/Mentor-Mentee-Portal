@@ -1,8 +1,4 @@
-"use server";
-
-import { cookies } from "next/headers";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected authentication error";
@@ -39,6 +35,7 @@ export async function signUpUser(formData: FormData) {
     const response = await fetch(`${API_URL}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password, name, rollNo }),
     });
 
@@ -48,25 +45,6 @@ export async function signUpUser(formData: FormData) {
       return {
         error: getApiError(result, `Sign up failed (${response.status} ${response.statusText})`),
       };
-    }
-
-    // Handle the session cookie
-    const setCookieHeader = response.headers.get("set-cookie");
-    if (setCookieHeader) {
-      const cookieStore = await cookies();
-      // Extract the secret from the cookie header if the backend sends it as a cookie
-      // Usually, the backend handles this by sending a Set-Cookie header.
-      // In Server Actions, we must manually set it in the Next.js store.
-      const match = setCookieHeader.match(/appwrite-session=([^;]+)/);
-      if (match) {
-        cookieStore.set("appwrite-session", match[1], {
-          path: "/",
-          httpOnly: true,
-          sameSite: "strict",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 60 * 60 * 24 * 7,
-        });
-      }
     }
 
     return {
@@ -90,6 +68,7 @@ export async function signInUser(formData: FormData) {
     const response = await fetch(`${API_URL}/auth/signin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
@@ -101,21 +80,6 @@ export async function signInUser(formData: FormData) {
         role: null,
         error: getApiError(result, `Login failed (${response.status} ${response.statusText})`),
       };
-    }
-
-    const setCookieHeader = response.headers.get("set-cookie");
-    if (setCookieHeader) {
-      const cookieStore = await cookies();
-      const match = setCookieHeader.match(/appwrite-session=([^;]+)/);
-      if (match) {
-        cookieStore.set("appwrite-session", match[1], {
-          path: "/",
-          httpOnly: true,
-          sameSite: "strict",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 60 * 60 * 24 * 7,
-        });
-      }
     }
 
     return {
@@ -133,14 +97,8 @@ export async function signInUser(formData: FormData) {
 
 export async function getLoggedInUser() {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("appwrite-session");
-    if (!sessionCookie || !sessionCookie.value) return null;
-
     const response = await fetch(`${API_URL}/auth/me`, {
-      headers: {
-        "Cookie": `appwrite-session=${sessionCookie.value}`
-      },
+      credentials: "include",
     });
 
     if (!response.ok) return null;
@@ -152,20 +110,10 @@ export async function getLoggedInUser() {
 
 export async function logoutUser() {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("appwrite-session");
-    if (!sessionCookie || !sessionCookie.value) return;
-
-    const response = await fetch(`${API_URL}/auth/logout`, {
+    await fetch(`${API_URL}/auth/logout`, {
       method: "POST",
-      headers: {
-        "Cookie": `appwrite-session=${sessionCookie.value}`
-      },
+      credentials: "include",
     });
-
-    if (response.ok) {
-      cookieStore.delete("appwrite-session");
-    }
   } catch (error) {
     console.error("Logout failed:", error);
   }

@@ -1,38 +1,35 @@
-import { getLoggedInUser } from "@/lib/actions/auth.actions";
-import { redirect } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getAcademicRecordsForProfile, getMenteeProfile } from "@/lib/actions/student.actions";
 import DownloadTranscriptBtn from "@/components/DownloadTranscriptBtn";
 import type { AcademicUploadRecord } from "@/types";
 
-export default async function AcademicsPage({ 
-  params 
-}: { 
-  params: Promise<{ profileId: string }> 
-}) {
-  const { profileId } = await params;
-  const user = await getLoggedInUser();
-  
-  if (!user) redirect("/sign-in");
+export default function AcademicsWidget({ profileId }: { profileId: string }) {
+  const [academicRecords, setAcademicRecords] = useState<AcademicUploadRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  let profileData = null;
-  let academicRecords: AcademicUploadRecord[] = [];
-  let latestRecord: AcademicUploadRecord | null = null;
+  useEffect(() => {
+    let active = true;
 
-  try {
-    const [profileRes, records] = await Promise.all([
+    Promise.all([
       getMenteeProfile(profileId),
       getAcademicRecordsForProfile(profileId),
-    ]);
+    ])
+      .then(([, records]) => {
+        if (active) setAcademicRecords((records || []) as AcademicUploadRecord[]);
+      })
+      .catch((error) => {
+        console.error("Academics data fetch failed:", error);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
 
-    profileData = profileRes;
-    academicRecords = records as AcademicUploadRecord[];
-    
-    if (academicRecords.length > 0) {
-      latestRecord = academicRecords[0];
-    }
-  } catch (error) {
-    console.error("Academics data fetch failed:", error);
-  }
+    return () => {
+      active = false;
+    };
+  }, [profileId]);
+
+  const latestRecord = academicRecords[0] || null;
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -89,7 +86,13 @@ export default async function AcademicsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {academicRecords.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400">
+                    Loading academic records...
+                  </td>
+                </tr>
+              ) : academicRecords.length > 0 ? (
                 academicRecords.map((record) => (
                   <tr key={record.$id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-700">Semester {record.semester}</td>

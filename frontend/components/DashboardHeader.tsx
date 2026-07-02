@@ -1,8 +1,8 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/lib/router-compat";
 import NotificationBell from "@/components/NotificationBell";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 
 type DashboardHeaderProps = {
   profileId: string;
@@ -52,7 +52,7 @@ export default function DashboardHeader({ profileId, user }: DashboardHeaderProp
         
         {/* Profile initials picture + Student Name & Roll No Capsule */}
         <Link 
-          href={`/dashboard/${profileId}/my-profile`}
+          to={`/dashboard/${profileId}/my-profile`}
           className="flex items-center gap-2.5 bg-slate-50/60 pl-2 pr-3.5 py-1.5 rounded-xl border border-slate-200/50 hover:bg-slate-100/50 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer select-none"
           title="View profile"
         >
