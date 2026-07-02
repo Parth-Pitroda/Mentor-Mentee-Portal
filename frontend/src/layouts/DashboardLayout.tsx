@@ -68,7 +68,7 @@ export default function DashboardLayout() {
       <div className="flex min-h-screen flex-col md:ml-64">
         <main className="flex-1 p-6 lg:p-10">
           <div className="mx-auto max-w-6xl">
-            <DashboardHeader user={{ name: state.data.user.name, email: state.data.user.email }} />
+            <DashboardHeader profileId={profileId} user={{ name: state.data.user.name, email: state.data.user.email }} />
             <Outlet context={context} />
           </div>
         </main>
