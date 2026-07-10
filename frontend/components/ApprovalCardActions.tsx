@@ -215,8 +215,8 @@ export default function ApprovalCardActions({
                   <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-2">
                     <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">Marksheet Scores</span>
                     <div className="flex flex-wrap gap-3 font-bold text-xs text-slate-700">
-                      <p>CPI: <span className="text-blue-600 font-extrabold">{extraDetails.cpi ?? "N/A"}</span></p>
-                      <p>SPI: <span className="text-blue-600 font-extrabold">{extraDetails.spi ?? "N/A"}</span></p>
+                      <p>CPI: <span className="text-blue-600 font-extrabold">{extraDetails.cpi !== undefined && extraDetails.cpi !== null && extraDetails.cpi !== "" ? Number(extraDetails.cpi).toFixed(2) : "N/A"}</span></p>
+                      <p>SPI: <span className="text-blue-600 font-extrabold">{extraDetails.spi !== undefined && extraDetails.spi !== null && extraDetails.spi !== "" ? Number(extraDetails.spi).toFixed(2) : "N/A"}</span></p>
                       {extraDetails.semester && <p>Semester: <span className="text-slate-800 font-extrabold">{extraDetails.semester}</span></p>}
                     </div>
                   </div>

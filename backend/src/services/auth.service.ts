@@ -1,6 +1,9 @@
 import { servicesContainer } from "../config/providers";
 
 export class AuthService {
+  /**
+   * Used in AuthController.signUp (POST /api/auth/signup)
+   */
   static async signUp(email: string, password: string, name: string, rollNo: string | null) {
     try {
       const auth = servicesContainer.getAuthService();
@@ -47,6 +50,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Used in AuthController.signIn (POST /api/auth/signin)
+   */
   static async signIn(email: string, password: string) {
     try {
       const auth = servicesContainer.getAuthService();
@@ -82,6 +88,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Used in AuthController.logout (POST /api/auth/logout)
+   */
   static async logout(sessionSecret: string) {
     try {
       await servicesContainer.getAuthService().deleteCurrentSession(sessionSecret);
@@ -92,6 +101,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Internal helper used in AuthService.validateSession and AuthController.me (GET /api/auth/me)
+   */
   static async getUser(sessionSecret: string) {
     try {
       return await servicesContainer.getAuthService().getSessionUser(sessionSecret);
@@ -101,6 +113,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Used in AuthController.me (GET /api/auth/me) and various middlewares/services
+   */
   static async validateSession(sessionSecret: string) {
     try {
       const user = await this.getUser(sessionSecret);

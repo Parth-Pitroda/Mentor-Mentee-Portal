@@ -23,7 +23,7 @@ export default function ApprovalQueue({ activeTab, pending }: { activeTab: strin
 
   if (activeTab === "academics") {
     return <Queue records={pending.academics} empty="No academic records awaiting review." render={(record: any) => (
-      <ApprovalCard key={record.$id} icon={<BookOpen />} title={record.studentName || "Academic record"} meta={`Semester ${record.semester || "N/A"}`} body={`SPI ${record.spi || "-"} / CPI ${record.cpi || "-"}`} fileId={record.documentId || record.fileId}>
+      <ApprovalCard key={record.$id} icon={<BookOpen />} title={record.studentName || "Academic record"} meta={`Semester ${record.semester || "N/A"}`} body={`SPI ${record.spi !== undefined && record.spi !== null ? Number(record.spi).toFixed(2) : "-"} / CPI ${record.cpi !== undefined && record.cpi !== null ? Number(record.cpi).toFixed(2) : "-"}`} fileId={record.documentId || record.fileId}>
         <ActionButton onClick={async () => { await updateAcademicStatus(record.$id, "Verified", record.studentId); refresh(); }} label="Verify" />
         <ActionButton onClick={async () => { await updateAcademicStatus(record.$id, "Rejected", record.studentId); refresh(); }} label="Reject" danger />
       </ApprovalCard>

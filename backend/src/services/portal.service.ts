@@ -154,6 +154,13 @@ function mergeNotifications(notifications: any[], activity: any[]) {
 }
 
 export class PortalService {
+  /**
+   * Action Router: Dispatches client request payloads to specific static handler methods.
+   * Invoked via route: POST /api/portal/action
+   * 
+   * The 'action' payload parameter corresponds directly to the method name to execute.
+   * Example: action: "getStudentProfile" calls PortalService.getStudentProfile.
+   */
   static async run(action: string, payload: any, ctx: PortalContext) {
     const method = (this as any)[action];
     if (typeof method !== "function" || action === "run") {
@@ -509,12 +516,34 @@ export class PortalService {
     if (isNaN(spi) || spi < 0 || spi > 10) throw new Error("SPI must be between 0 and 10.");
     if (isNaN(cpi) || cpi < 0 || cpi > 10) throw new Error("CPI must be between 0 and 10.");
 
+    // Validate decimal digits (maximum 2 decimal places)
+    const spiStr = String(form.spi || "").trim();
+    const cpiStr = String(form.cpi || "").trim();
+    if (spiStr.includes('.') && spiStr.split('.')[1].length > 2) {
+      throw new Error("SPI cannot have more than 2 decimal places.");
+    }
+    if (cpiStr.includes('.') && cpiStr.split('.')[1].length > 2) {
+      throw new Error("CPI cannot have more than 2 decimal places.");
+    }
+
+    // Prevent duplicate semester uploads
+    const semester = Number(form.semester);
+    if (isNaN(semester) || semester < 1 || semester > 8) throw new Error("Semester must be between 1 and 8.");
+    const existing = await adminDatabases().listDocuments(databaseId(), academicsId(), [
+      Query.equal("studentId", [studentId]),
+      Query.equal("semester", [String(semester)]),
+      Query.limit(1),
+    ]);
+    if (existing.documents.length > 0) {
+      throw new Error(`Academic record for Semester ${semester} has already been submitted.`);
+    }
+
     const fileId = await uploadFile(form.file, { required: true, maxBytes: 5 * 1024 * 1024, allowedTypes: ["application/pdf", "image/jpeg", "image/png"] });
     const record = await adminDatabases().createDocument(databaseId(), academicsId(), ID.unique(), {
       studentId,
       semester: form.semester,
-      spi: form.spi,
-      cpi: form.cpi,
+      spi: spi.toFixed(2),
+      cpi: cpi.toFixed(2),
       fileId,
       status: "Pending",
     });

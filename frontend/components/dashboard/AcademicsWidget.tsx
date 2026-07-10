@@ -51,14 +51,14 @@ export default function AcademicsWidget({ profileId }: { profileId: string }) {
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cumulative Performance (CPI)</h3>
           <p className="text-3xl font-bold text-slate-800 mt-2">
-            {latestRecord?.cpi || "-"}
+            {latestRecord?.cpi !== undefined && latestRecord?.cpi !== null ? Number(latestRecord.cpi).toFixed(2) : "-"}
           </p>
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Latest Semester (SPI)</h3>
           <p className="text-3xl font-bold text-slate-800 mt-2">
-            {latestRecord?.spi || "-"}
+            {latestRecord?.spi !== undefined && latestRecord?.spi !== null ? Number(latestRecord.spi).toFixed(2) : "-"}
           </p>
         </div>
       </div>
@@ -96,8 +96,8 @@ export default function AcademicsWidget({ profileId }: { profileId: string }) {
                 academicRecords.map((record) => (
                   <tr key={record.$id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-700">Semester {record.semester}</td>
-                    <td className="px-6 py-4 text-slate-600">{record.spi}</td>
-                    <td className="px-6 py-4 font-medium text-blue-600">{record.cpi}</td>
+                    <td className="px-6 py-4 text-slate-600">{record.spi !== undefined && record.spi !== null ? Number(record.spi).toFixed(2) : "-"}</td>
+                    <td className="px-6 py-4 font-medium text-blue-600">{record.cpi !== undefined && record.cpi !== null ? Number(record.cpi).toFixed(2) : "-"}</td>
                     <td className="px-6 py-4">
                       
                       {/* Dynamic Badge Rendering based on Appwrite 'status' string */}

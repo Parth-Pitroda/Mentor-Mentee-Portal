@@ -3,6 +3,9 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import { StorageService } from "../services/storage.service";
 
 export class StorageController {
+  /**
+   * Route: GET /api/storage/files/:fileId/view
+   */
   static async view(req: AuthRequest, res: Response) {
     try {
       const file = await StorageService.getFile(String(req.params.fileId));
@@ -11,7 +14,7 @@ export class StorageController {
       res.setHeader("Content-Length", String(file.buffer.length));
       const isDownload = req.query.download === "1" || req.query.download === "true";
       res.setHeader("Content-Disposition", `${isDownload ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`);
-      return res.send(file.buffer);
+      return res.end(file.buffer);
     } catch (error: any) {
       return res.status(404).json({ error: error.message || "File not found" });
     }
@@ -19,5 +22,8 @@ export class StorageController {
 }
 
 function safeFileName(fileName: string) {
-  return fileName.replace(/["\r\n]/g, "_");
+  // Strip non-ASCII characters to prevent Node.js header validation crashes
+  const asciiOnly = fileName.replace(/[^\x20-\x7E]/g, "_");
+  // Strip double quotes, backslashes, semicolons, and newlines which break Content-Disposition
+  return asciiOnly.replace(/["\\\r\n;]/g, "_");
 }

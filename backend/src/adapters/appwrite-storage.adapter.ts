@@ -1,6 +1,5 @@
 import { ID, Storage } from "node-appwrite";
 import { EncodedUploadFile, IStorageService, StoredFile } from "../interface/storage.interface";
-
 const { InputFile } = require("node-appwrite/file");
 
 export class AppwriteStorageAdapter implements IStorageService {

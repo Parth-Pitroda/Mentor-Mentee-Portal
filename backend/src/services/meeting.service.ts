@@ -9,7 +9,7 @@ export class MeetingService {
   }
 
   /**
-   * Fetch all meetings for a specific student
+   * Used in MeetingController.getMeetings (GET /api/meetings/student/:studentId)
    */
   static async getStudentMeetings(studentId: string, sessionSecret?: string) {
     try {
@@ -26,7 +26,7 @@ export class MeetingService {
   }
 
   /**
-   * Fetch most recent meetings for a student
+   * Currently unused in routes (Service helper method)
    */
   static async getRecentMeetings(studentId: string, limit: number = 5) {
     try {
@@ -42,7 +42,7 @@ export class MeetingService {
   }
 
   /**
-   * Fetch meetings with "Requested" status for a student
+   * Currently unused in routes (Service helper method)
    */
   static async getPendingRequests(studentId: string) {
     try {
@@ -58,7 +58,7 @@ export class MeetingService {
   }
 
   /**
-   * Create a new meeting (Request or Log)
+   * Used in MeetingController.logMeeting (POST /api/meetings/log)
    */
   static async createMeeting(data: any, sessionSecret?: string) {
     try {
@@ -94,7 +94,9 @@ export class MeetingService {
   }
 
   /**
-   * Update meeting details or status
+   * Used in:
+   * - MeetingController.updateStatus (PATCH /api/meetings/status/:meetingId/:studentId)
+   * - MeetingController.respondToRequest (POST /api/meetings/respond/:meetingId)
    */
   static async updateMeeting(meetingId: string, updates: any, sessionSecret?: string) {
     try {
@@ -114,7 +116,7 @@ export class MeetingService {
   }
 
   /**
-   * Fetch all "Requested" meetings for a mentor's students
+   * Used in MeetingController.getRequests (GET /api/meetings/requests/:mentorId)
    */
   static async getMentorRequests(mentorId: string) {
     try {
@@ -148,7 +150,7 @@ export class MeetingService {
   }
 
   /**
-   * Fetch "Confirmed" meetings for a mentor's students
+   * Used in PortalService.getMentorScheduledMeetings (invoked by POST /api/portal/action)
    */
   static async getMentorScheduled(mentorId: string) {
     try {

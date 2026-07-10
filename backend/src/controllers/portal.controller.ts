@@ -3,6 +3,9 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import { PortalService } from "../services/portal.service";
 
 export class PortalController {
+  /**
+   * Route: POST /api/portal/action
+   */
   static async run(req: AuthRequest, res: Response) {
     try {
       if (!req.user || !req.profile) {
