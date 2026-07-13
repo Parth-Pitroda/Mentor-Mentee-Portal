@@ -141,7 +141,7 @@ export default function AchievementsManager({ initialRecords, profileId, isMento
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proof Document (Optional Image/PDF)</label>
-              <StyledFileInput name="file" accept="image/*,.pdf" label="Choose proof" />
+              <StyledFileInput name="file" accept="image/jpeg,image/png,.pdf" label="Choose proof" />
             </div>
 
             <button disabled={isLoading} type="submit" className="rounded-lg bg-blue-600 px-6 py-2.5 font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50">

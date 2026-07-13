@@ -1,7 +1,9 @@
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+
 export function getFileViewUrl(fileId: string) {
-  return `/api/files/${encodeURIComponent(fileId)}`;
+  return `${BASE_URL}/storage/files/${encodeURIComponent(fileId)}/view`;
 }
 
 export function getFileDownloadUrl(fileId: string) {
-  return `/api/files/${encodeURIComponent(fileId)}?download=1`;
+  return `${BASE_URL}/storage/files/${encodeURIComponent(fileId)}/view?download=1`;
 }

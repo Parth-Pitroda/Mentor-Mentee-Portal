@@ -535,14 +535,15 @@ export class PortalService {
   static async uploadAchievement({ studentId, form }: { studentId: string; form: any }, ctx: PortalContext) {
     if (ctx.profile.$id !== studentId) throw new Error("You can only update your own profile.");
     const fileId = await uploadFile(form.file, { required: false, maxBytes: 5 * 1024 * 1024, allowedTypes: ["application/pdf", "image/jpeg", "image/png"] });
-    const achievement = await adminDatabases().createDocument(databaseId(), achievementsId(), ID.unique(), {
+    const docData: Record<string, any> = {
       studentId,
       title: form.title,
       category: form.category,
-      description: form.description,
-      fileId,
+      description: form.description || "",
       status: "Pending",
-    });
+    };
+    if (fileId) docData.fileId = fileId;
+    const achievement = await adminDatabases().createDocument(databaseId(), achievementsId(), ID.unique(), docData);
     await notifyAssignedMentor(studentId, `A mentee submitted "${form.title}" for achievement approval.`, "achievement_submission", achievement.$id);
     return { success: true };
   }

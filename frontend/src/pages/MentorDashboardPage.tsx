@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAsyncData } from "@/src/hooks/useAsyncData";
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
@@ -34,40 +34,101 @@ export default function MentorDashboardPage() {
   const studentId = searchParams.get("id") || "";
   const q = searchParams.get("q") || "";
 
+  // 1. Fetch base dashboard data only ONCE (deps: [])
   const state = useAsyncData(async () => {
     const user = await getLoggedInUser();
     if (!user) return null;
 
-    const [mentees, notices, scheduledMeetings, pendingApprovals, directory] = await Promise.all([
+    const [mentees, notices, scheduledMeetings, pendingApprovals] = await Promise.all([
       getMentorRoster(user.$id),
       getLatestNotices(5),
       getMentorScheduledMeetings(user.$id),
       getPendingApprovals(user.$id),
-      activeTab === "directory" ? getStudentDirectory() : Promise.resolve([]),
     ]);
 
-    let selectedStudent: any = null;
-    let latestAcademicRecord: any = null;
-    let academicRecords: any[] = [];
-    let achievementRecords: any[] = [];
-    let mentorNote: any = null;
+    return { user, mentees, notices, scheduledMeetings, pendingApprovals };
+  }, []);
 
-    if (studentId && ["student-profile", "student-academics", "student-achievements"].includes(activeTab)) {
-      const [student, latest, academics, achievements, note] = await Promise.all([
-        getMenteeProfile(studentId),
-        getLatestAcademicRecord(studentId),
-        getAcademicRecordsForProfile(studentId),
-        getAchievementRecordsForProfile(studentId),
-        getMentorNote(studentId),
-      ]);
-      selectedStudent = student;
-      latestAcademicRecord = latest;
-      academicRecords = academics as any[];
-      achievementRecords = achievements as any[];
-      mentorNote = note;
+  // 2. Local state for tab-specific or student-specific data
+  const [tabData, setTabData] = useState<{
+    loading: boolean;
+    directory: any[];
+    selectedStudent: any;
+    latestAcademicRecord: any;
+    academicRecords: any[];
+    achievementRecords: any[];
+    mentorNote: any;
+  }>({
+    loading: false,
+    directory: [],
+    selectedStudent: null,
+    latestAcademicRecord: null,
+    academicRecords: [],
+    achievementRecords: [],
+    mentorNote: null,
+  });
+
+  // 3. Fetch tab/student data on parameter change without triggering global layout loading
+  useEffect(() => {
+    let active = true;
+    const needsDirectory = activeTab === "directory";
+    const needsStudent = !!(studentId && ["student-profile", "student-academics", "student-achievements"].includes(activeTab));
+
+    if (!needsDirectory && !needsStudent) {
+      setTabData({
+        loading: false,
+        directory: [],
+        selectedStudent: null,
+        latestAcademicRecord: null,
+        academicRecords: [],
+        achievementRecords: [],
+        mentorNote: null,
+      });
+      return;
     }
 
-    return { user, mentees, notices, scheduledMeetings, pendingApprovals, directory, selectedStudent, latestAcademicRecord, academicRecords, achievementRecords, mentorNote };
+    setTabData((prev) => ({ ...prev, loading: true }));
+
+    const loadData = async () => {
+      try {
+        const dirPromise = needsDirectory ? getStudentDirectory() : Promise.resolve([]);
+        const studentPromise = needsStudent ? Promise.all([
+          getMenteeProfile(studentId),
+          getLatestAcademicRecord(studentId),
+          getAcademicRecordsForProfile(studentId),
+          getAchievementRecordsForProfile(studentId),
+          getMentorNote(studentId),
+        ]) : Promise.resolve([null, null, [], [], null]);
+
+        const [directory, [student, latest, academics, achievements, note]] = await Promise.all([
+          dirPromise,
+          studentPromise,
+        ]);
+
+        if (active) {
+          setTabData({
+            loading: false,
+            directory: directory || [],
+            selectedStudent: student,
+            latestAcademicRecord: latest,
+            academicRecords: academics || [],
+            achievementRecords: achievements || [],
+            mentorNote: note,
+          });
+        }
+      } catch (err) {
+        console.error("Error loading tab/student data:", err);
+        if (active) {
+          setTabData((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
   }, [activeTab, studentId]);
 
   useEffect(() => {
@@ -92,13 +153,54 @@ export default function MentorDashboardPage() {
           )}
           {activeTab === "roster" && <MentorRosterCards mentees={data.mentees} searchQuery={q} />}
           {activeTab === "meetings" && <MeetingsTabClient mentees={data.mentees} scheduledMeetings={data.scheduledMeetings} meetingRequests={data.pendingApprovals.meetingRequests} />}
-          {activeTab === "directory" && <StudentDirectoryTable students={data.directory} />}
-          {activeTab === "notices" && <NoticeList notices={data.notices} />}
-          {activeTab === "student-profile" && data.selectedStudent && (
-            <StudentDossier student={data.selectedStudent} user={data.user} latestAcademicRecord={data.latestAcademicRecord} achievementRecords={data.achievementRecords} mentorNote={data.mentorNote} />
+          
+          {activeTab === "directory" && (
+            tabData.loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+              </div>
+            ) : (
+              <StudentDirectoryTable students={tabData.directory} />
+            )
           )}
-          {activeTab === "student-academics" && data.selectedStudent && <AcademicsManager initialRecords={data.academicRecords} profileId={data.selectedStudent.$id} isMentor />}
-          {activeTab === "student-achievements" && data.selectedStudent && <AchievementsManager initialRecords={data.achievementRecords} profileId={data.selectedStudent.$id} isMentor />}
+          
+          {activeTab === "notices" && <NoticeList notices={data.notices} />}
+          
+          {activeTab === "student-profile" && (
+            tabData.loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+              </div>
+            ) : (
+              tabData.selectedStudent && (
+                <StudentDossier student={tabData.selectedStudent} user={data.user} latestAcademicRecord={tabData.latestAcademicRecord} achievementRecords={tabData.achievementRecords} mentorNote={tabData.mentorNote} />
+              )
+            )
+          )}
+          
+          {activeTab === "student-academics" && (
+            tabData.loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+              </div>
+            ) : (
+              tabData.selectedStudent && (
+                <AcademicsManager initialRecords={tabData.academicRecords} profileId={tabData.selectedStudent.$id} isMentor />
+              )
+            )
+          )}
+          
+          {activeTab === "student-achievements" && (
+            tabData.loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+              </div>
+            ) : (
+              tabData.selectedStudent && (
+                <AchievementsManager initialRecords={tabData.achievementRecords} profileId={tabData.selectedStudent.$id} isMentor />
+              )
+            )
+          )}
         </div>
       </main>
     </div>
