@@ -43,7 +43,7 @@ export default function LandingPageClient() {
         className="w-full px-6 sm:px-12 py-6 z-10"
       >
         <img 
-          src="/pdeu_logo_new.png" 
+          src="/pdeu_new_logo.png" 
           alt="PDEU Logo" 
           className="h-20 w-auto object-contain select-none"
         />
