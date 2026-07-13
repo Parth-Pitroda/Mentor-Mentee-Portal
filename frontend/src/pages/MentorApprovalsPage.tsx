@@ -19,7 +19,7 @@ export default function MentorApprovalsPage() {
     if (!user) return null;
     const pending = await getPendingApprovals(user.$id);
     return { user, pending };
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     if (!state.loading && !state.data?.user) navigate("/sign-in", { replace: true });
