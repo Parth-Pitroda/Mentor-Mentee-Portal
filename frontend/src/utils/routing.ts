@@ -18,6 +18,8 @@ export function mentorTitle(tab: string) {
     meetings: "Meetings",
     directory: "Student Directory",
     notices: "University Notices",
+    approvals: "Pending Approvals",
+    profile: "My Profile",
     "student-profile": "Student Dossier",
     "student-academics": "Academic History",
     "student-achievements": "Achievements",

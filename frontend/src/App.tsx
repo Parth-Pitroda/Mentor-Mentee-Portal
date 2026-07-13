@@ -11,11 +11,11 @@ import DashboardOverviewPage from "./pages/DashboardOverviewPage";
 import AcademicsPage from "./pages/AcademicsPage";
 import AchievementsPage from "./pages/AchievementsPage";
 import StudentMeetingsPage from "./pages/StudentMeetingsPage";
-import ProfilePage from "./pages/ProfilePage";
+import MyProfilePage from "./pages/MyProfilePage";
+import MentorProfilePage from "./pages/MentorProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import MentorDashboardPage from "./pages/MentorDashboardPage";
-import MentorApprovalsPage from "./pages/MentorApprovalsPage";
 import MentorStudentDetailPage from "./pages/MentorStudentDetailPage";
 import BookingPage from "./pages/BookingPage";
 import MessagesPage from "./pages/MessagesPage";
@@ -46,11 +46,11 @@ export default function App() {
         <Route path="achievements" element={<AchievementsPage />} />
         <Route path="meetings" element={<StudentMeetingsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="my-profile" element={<MyProfilePage />} />
+        <Route path="profile" element={<MentorProfilePage />} />
       </Route>
       <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
       <Route path="/mentor-dashboard" element={<MentorDashboardPage />} />
-      <Route path="/mentor-dashboard/approvals" element={<MentorApprovalsPage />} />
       <Route path="/mentor-dashboard/student/:id" element={<MentorStudentDetailPage />} />
       <Route path="/booking" element={<SimpleProtectedPage>{() => <BookingPage />}</SimpleProtectedPage>} />
       <Route path="/messages" element={<SimpleProtectedPage>{() => <MessagesPage />}</SimpleProtectedPage>} />

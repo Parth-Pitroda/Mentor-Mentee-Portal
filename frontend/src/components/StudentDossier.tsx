@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
 import MentorNotesEditor from "@/components/MentorNotesEditor";
 import AchievementsWidget from "@/components/dashboard/AchievementsWidget";
 import { getFileViewUrl } from "@/lib/files";
@@ -17,10 +16,7 @@ export default function StudentDossier({ student, latestAcademicRecord, achievem
   }
 
   return (
-    <div className="space-y-8">
-      <Link to="?tab=roster" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-900">
-        <ChevronLeft className="h-4 w-4" /> Back to Roster
-      </Link>
+    <div className="space-y-6">
       <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
         <div className="space-y-8 md:col-span-2">
           <div>
@@ -55,9 +51,25 @@ export default function StudentDossier({ student, latestAcademicRecord, achievem
             )}
           </div>
           <h2 className="text-2xl font-black tracking-tight text-slate-900">{student.fullName}</h2>
-          <p className="text-xs font-semibold text-slate-500">Student ID: <b className="text-slate-800">{student.rollNo || "N/A"}</b></p>
+          <p className="text-xs font-semibold text-slate-500 mb-2">Student ID: <b className="text-slate-800">{student.rollNo || "N/A"}</b></p>
+          
+          <div className="flex flex-col gap-2 pt-1 pb-2">
+            <Link
+              to={`?tab=student-academics&id=${student.$id}`}
+              className="w-full text-center rounded-xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-750 shadow-sm hover:bg-slate-50 hover:text-blue-600 transition-colors"
+            >
+              Academic Records & Files 📄
+            </Link>
+            <Link
+              to={`?tab=student-achievements&id=${student.$id}`}
+              className="w-full text-center rounded-xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-750 shadow-sm hover:bg-slate-50 hover:text-blue-600 transition-colors"
+            >
+              Achievements & Certificates 🏆
+            </Link>
+          </div>
+
           {!student.isVerified && (
-            <button onClick={verify} className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-sm hover:bg-slate-800">
+            <button onClick={verify} className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors">
               Mark as Verified
             </button>
           )}
@@ -65,8 +77,8 @@ export default function StudentDossier({ student, latestAcademicRecord, achievem
       </div>
 
       <div className="grid grid-cols-1 gap-8 border-t border-slate-200 pt-6 md:grid-cols-3">
-        <StatCard label="Current CGPA" value={student.cgpa !== undefined && student.cgpa !== null && student.cgpa !== "" ? Number(student.cgpa).toFixed(2) : "N/A"} />
-        <StatCard label="Latest SPI" value={latestAcademicRecord?.spi !== undefined && latestAcademicRecord?.spi !== null && latestAcademicRecord?.spi !== "" ? Number(latestAcademicRecord.spi).toFixed(2) : "N/A"} />
+        <StatCard label="Current CGPA" value={student.cgpa !== undefined && student.cgpa !== null && student.cgpa !== "" ? Number(student.cgpa).toFixed(2) : "N/A"} to={`?tab=student-academics&id=${student.$id}`} />
+        <StatCard label="Latest SPI" value={latestAcademicRecord?.spi !== undefined && latestAcademicRecord?.spi !== null && latestAcademicRecord?.spi !== "" ? Number(latestAcademicRecord.spi).toFixed(2) : "N/A"} to={`?tab=student-academics&id=${student.$id}`} />
         <StatCard label="Total Meetings" value={studentMeetings.length} />
       </div>
       <AchievementsWidget studentId={student.$id} initialData={achievementRecords || []} />

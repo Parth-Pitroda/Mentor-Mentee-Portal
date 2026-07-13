@@ -28,27 +28,43 @@ export default function DashboardLayout() {
   useEffect(() => {
     if (state.loading) return;
     const data = state.data;
-    if (!data?.user || !data.currentProfile || !data.targetProfile) {
+
+    // 1. If user session is absent, redirect to sign-in
+    if (!data?.user) {
       navigate("/sign-in", { replace: true });
       return;
     }
 
+    // 2. If the user's own profile is missing, they need onboarding
+    if (!data.currentProfile) {
+      navigate("/onboarding", { replace: true });
+      return;
+    }
+
+    // 3. If target profile load failed (invalid URL), redirect to their own dashboard
+    if (!data.targetProfile) {
+      navigate(`/dashboard/${data.currentProfile.$id}`, { replace: true });
+      return;
+    }
+
+    // 4. If mentor, redirect to mentor dashboard roster detail view
     if (data.currentProfile.role === "mentor") {
       navigate(`/mentor-dashboard?tab=student-profile&id=${profileId}`, { replace: true });
       return;
     }
 
+    // 5. Prevent students from viewing other student dashboards
     if (data.targetProfile.email?.toLowerCase() !== data.user.email.toLowerCase()) {
       navigate(`/dashboard/${data.currentProfile.$id}`, { replace: true });
     }
   }, [navigate, profileId, state.data, state.loading]);
 
-  if (state.loading || !state.data?.user || !state.data.targetProfile) return <LoadingPage />;
+  if (state.loading || !state.data?.user || !state.data.currentProfile) return <LoadingPage />;
 
   const context: DashboardContext = {
     user: state.data.user,
     profileId,
-    profile: state.data.targetProfile as UserProfile,
+    profile: (state.data.targetProfile || state.data.currentProfile) as UserProfile,
   };
 
   return (

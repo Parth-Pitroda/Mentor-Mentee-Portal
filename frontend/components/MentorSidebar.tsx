@@ -13,7 +13,7 @@ const navItems = [
   { key: "roster", label: "My Mentees", href: "/mentor-dashboard?tab=roster" },
   { key: "meetings", label: "Meetings", href: "/mentor-dashboard?tab=meetings" },
   { key: "directory", label: "Student Directory", href: "/mentor-dashboard?tab=directory" },
-  { key: "approvals", label: "Pending Approvals", href: "/mentor-dashboard/approvals" },
+  { key: "approvals", label: "Pending Approvals", href: "/mentor-dashboard?tab=approvals" },
   { key: "notices", label: "Global Notices", href: "/mentor-dashboard?tab=notices" },
   { key: "profile", label: "My Profile", href: "/mentor-dashboard?tab=profile" },
 ] as const;
