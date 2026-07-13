@@ -3,17 +3,26 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import { StorageService } from "../services/storage.service";
 
 export class StorageController {
+  /**
+   * Route: GET /api/storage/files/:fileId/view
+   */
   static async view(req: AuthRequest, res: Response) {
     try {
       const file = await StorageService.getFile(String(req.params.fileId));
-      
-      const isDownload = req.query.download === "1" || req.query.download === "true";
-      
+
+      const isDownload =
+        req.query.download === "1" || req.query.download === "true";
+
       res.setHeader("Cache-Control", "private, max-age=300");
-      res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
+      res.setHeader(
+        "Content-Type",
+        file.mimeType || "application/octet-stream",
+      );
       res.setHeader("Content-Length", String(file.buffer.length));
-      res.setHeader("Content-Disposition", `${isDownload ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`);
-      
+      res.setHeader(
+        "Content-Disposition",
+        `${isDownload ? "attachment" : "inline"}; filename="${safeFileName(file.fileName)}"`,
+      );
       return res.send(file.buffer);
     } catch (error: any) {
       // Clear headers if they were partially set, so we can return a proper JSON error

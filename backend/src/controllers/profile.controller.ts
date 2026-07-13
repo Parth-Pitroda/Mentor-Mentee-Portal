@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { ProfileService } from "../services/profile.service";
 
 export class ProfileController {
+  /**
+   * Route: GET /api/profiles/me
+   */
   static async getMe(req: any, res: Response) {
     try {
       return res.status(200).json(req.profile);
@@ -10,6 +13,9 @@ export class ProfileController {
     }
   }
 
+  /**
+   * Route: GET /api/profiles/:id
+   */
   static async getById(req: Request, res: Response) {
     try {
       const profile = await ProfileService.getProfileById(String(req.params.id));
@@ -19,6 +25,9 @@ export class ProfileController {
     }
   }
 
+  /**
+   * Route: PATCH /api/profiles/:id
+   */
   static async update(req: any, res: Response) {
     try {
       const updated = await ProfileService.updateProfile(
@@ -32,6 +41,9 @@ export class ProfileController {
     }
   }
 
+  /**
+   * Route: GET /api/profiles/mentees
+   */
   static async getMentees(req: Request, res: Response) {
     try {
       const mentees = await ProfileService.listMentees();

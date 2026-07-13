@@ -2,6 +2,9 @@ import { ProfileUpdateSchema } from "../validators/updateProfile";
 import { servicesContainer } from "../config/providers";
 
 export class StudentService {
+  /**
+   * Internal helper used in various authentication/profile lookups.
+   */
   static async getProfileByEmail(email: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -14,6 +17,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.getProfile (GET /api/student/profile/:profileId)
+   */
   static async getStudentProfile(profileId: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -41,6 +47,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in PortalService.createStudentProfile (invoked by POST /api/portal/action)
+   */
   static async createStudentProfile(studentData: any) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -64,6 +73,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.updateProfile (PUT /api/student/profile/:profileId)
+   */
   static async updateProfileDetails(profileId: string, department: string, skillsString: string) {
     try {
       const validatedData = ProfileUpdateSchema.safeParse({
@@ -101,6 +113,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.getMenteeProfile (GET /api/student/mentee/:userId)
+   */
   static async getMenteeProfile(userId: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -113,6 +128,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.getLatestAcademic (GET /api/student/academics/latest/:studentId)
+   */
   static async getLatestAcademicRecord(studentId: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -129,6 +147,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.getAcademicRecords (GET /api/student/academics/:studentId)
+   */
   static async getAcademicRecordsForProfile(studentId: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -144,6 +165,9 @@ export class StudentService {
     }
   }
 
+  /**
+   * Used in StudentController.getAchievementRecords (GET /api/student/achievements/:studentId)
+   */
   static async getAchievementRecordsForProfile(studentId: string) {
     try {
       const db = servicesContainer.getDatabaseService();

@@ -1,14 +1,20 @@
 import { servicesContainer } from "../config/providers";
 
 export class AdminService {
+  /**
+   * Used in AdminController.getAnalytics (GET /api/admin/analytics)
+   */
   static async getSystemAnalytics() {
     try {
       const db = servicesContainer.getDatabaseService();
       const profileColl = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_ID!;
       const meetingColl = process.env.NEXT_PUBLIC_APPWRITE_MEETINGS_COLLECTION_ID!;
       const [mentees, verifiedMentees, meetings] = await Promise.all([
-        db.listDocuments(profileColl, { equals: { role: "mentee" } }),
-        db.listDocuments(profileColl, { equals: { role: "mentee", isVerified: true } }),
+        db.listDocuments(profileColl, [{ type: "equal", field: "role", value: "mentee" }]),
+        db.listDocuments(profileColl, [
+          { type: "equal", field: "role", value: "mentee" },
+          { type: "equal", field: "isVerified", value: true }
+        ]),
         db.listDocuments(meetingColl)
       ]);
 
@@ -24,6 +30,9 @@ export class AdminService {
     }
   }
 
+  /**
+   * Used in AdminController.assignMentor (POST /api/admin/assign-mentor)
+   */
   static async assignMentor(studentId: string, mentorId: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -51,6 +60,9 @@ export class AdminService {
     }
   }
 
+  /**
+   * Used in AdminController.createNotice (POST /api/admin/notice)
+   */
   static async createGlobalNotice(title: string, content: string) {
     try {
       const db = servicesContainer.getDatabaseService();
@@ -66,6 +78,9 @@ export class AdminService {
     }
   }
 
+  /**
+   * Used in AdminController.bulkImport (POST /api/admin/bulk-import)
+   */
   static async bulkImportStudents(studentList: Array<{ fullName: string, email: string, department: string }>) {
     try {
       const auth = servicesContainer.getAuthService();

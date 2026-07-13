@@ -46,12 +46,73 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
     setMounted(true);
   }, []);
 
+  // Real-time input constraint: allow only valid score format (0-10, max 2 decimal places)
+  const constrainScoreInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    let val = input.value;
+
+    // Strip anything that isn't a digit or a single decimal point
+    val = val.replace(/[^0-9.]/g, '');
+
+    // Prevent multiple decimal points
+    const parts = val.split('.');
+    if (parts.length > 2) {
+      val = parts[0] + '.' + parts.slice(1).join('');
+    }
+
+    // Limit to 2 digits after the decimal point
+    if (parts.length === 2 && parts[1].length > 2) {
+      val = parts[0] + '.' + parts[1].slice(0, 2);
+    }
+
+    // Cap the numeric value at 10
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 10) {
+      val = '10';
+    }
+
+    // Prevent leading zeros like "00", "01" etc. (allow "0" and "0.xx")
+    if (val.length > 1 && val[0] === '0' && val[1] !== '.') {
+      val = val.slice(1);
+    }
+
+    input.value = val;
+  };
+
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     const formData = new FormData(e.currentTarget);
+    const spiStr = (formData.get("spi") as string || "").trim();
+    const cpiStr = (formData.get("cpi") as string || "").trim();
+
+    const spi = Number(spiStr);
+    const cpi = Number(cpiStr);
+
+    if (isNaN(spi) || spi < 0 || spi > 10) {
+      setError("SPI must be between 0 and 10.");
+      setIsLoading(false);
+      return;
+    }
+    if (isNaN(cpi) || cpi < 0 || cpi > 10) {
+      setError("CPI must be between 0 and 10.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (spiStr.includes('.') && spiStr.split('.')[1].length > 2) {
+      setError("SPI can have at most 2 digits after the decimal point.");
+      setIsLoading(false);
+      return;
+    }
+    if (cpiStr.includes('.') && cpiStr.split('.')[1].length > 2) {
+      setError("CPI can have at most 2 digits after the decimal point.");
+      setIsLoading(false);
+      return;
+    }
+
     const result = await uploadAcademicRecord(formData, profileId);
 
     if (result.success) {
@@ -84,6 +145,10 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
     : 0;
 
   const completedCount = verifiedRecords.length;
+
+  // --- AVAILABLE SEMESTERS (exclude already uploaded ones) ---
+  const uploadedSemesters = new Set(initialRecords.map(r => Number(r.semester)));
+  const availableSemesters = [1, 2, 3, 4, 5, 6, 7, 8].filter(s => !uploadedSemesters.has(s));
 
   // --- RECHARTS PROGRESS GRAPH DATA ---
   const chartData = sortedVerified.map(r => ({
@@ -226,8 +291,8 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
                     initialRecords.map((record) => (
                       <tr key={record.$id} className="hover:bg-slate-50/40 transition-colors">
                         <td className="px-6 py-4.5 font-bold text-slate-800">Sem {record.semester}</td>
-                        <td className="px-6 py-4.5">{record.spi}</td>
-                        <td className="px-6 py-4.5">{record.cpi}</td>
+                        <td className="px-6 py-4.5">{record.spi !== undefined && record.spi !== null ? Number(record.spi).toFixed(2) : "-"}</td>
+                        <td className="px-6 py-4.5">{record.cpi !== undefined && record.cpi !== null ? Number(record.cpi).toFixed(2) : "-"}</td>
                         <td className="px-6 py-4.5">
                           <span className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider border ${
                             record.status === 'Verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
@@ -243,9 +308,9 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
                               href={getFileViewUrl(record.fileId)} 
                               target="_blank" 
                               rel="noopener noreferrer" 
-                              className="text-blue-600 hover:underline font-extrabold text-left cursor-pointer"
+                              className="inline-block rounded-lg bg-slate-900 hover:bg-slate-800 px-4 py-2 font-bold text-white text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-sm"
                             >
-                              📄 View File
+                              View
                             </a>
                           ) : (
                             <span className="text-slate-400 italic">No File</span>
@@ -351,21 +416,35 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
 
 
           <div className="bg-white border border-slate-200/60 rounded-2xl p-6 md:p-8 shadow-[0_4px_30px_rgba(0,0,0,0.015)]">
+            {availableSemesters.length === 0 ? (
+              <div className="text-center py-16 space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 mb-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                </div>
+                <h3 className="text-lg font-extrabold text-slate-800">All Semesters Uploaded</h3>
+                <p className="text-sm text-slate-500 font-medium max-w-sm mx-auto">You have already submitted academic records for all 8 semesters. Switch to the Dashboard tab to view your records.</p>
+              </div>
+            ) : (
             <form onSubmit={handleUpload} className="space-y-6">
               {error && <div className="rounded-xl bg-red-50 p-4 text-xs font-bold text-red-650 border border-red-100">{error}</div>}
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-[10px] font-black text-slate-405 uppercase tracking-widest mb-2.5">Semester Term</label>
-                  <input required name="semester" type="number" min="1" max="8" className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-850 transition-all font-semibold" placeholder="e.g. 3" />
+                  <select required name="semester" className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-850 transition-all font-semibold appearance-none cursor-pointer" defaultValue="">
+                    <option value="" disabled>Select semester</option>
+                    {availableSemesters.map(s => (
+                      <option key={s} value={s}>Semester {s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-405 uppercase tracking-widest mb-2.5">SPI</label>
-                  <input required name="spi" type="number" step="0.01" min="0" max="10" className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-855 transition-all font-semibold" placeholder="e.g. 8.50" />
+                  <input required name="spi" type="text" inputMode="decimal" pattern="^(10(\.0{0,2})?|[0-9](\.[0-9]{1,2})?)$" onInput={constrainScoreInput} className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-855 transition-all font-semibold" placeholder="e.g. 8.50" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-405 uppercase tracking-widest mb-2.5">CPI</label>
-                  <input required name="cpi" type="number" step="0.01" min="0" max="10" className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-855 transition-all font-semibold" placeholder="e.g. 8.20" />
+                  <input required name="cpi" type="text" inputMode="decimal" pattern="^(10(\.0{0,2})?|[0-9](\.[0-9]{1,2})?)$" onInput={constrainScoreInput} className="w-full rounded-xl border border-slate-200 bg-white p-3.5 outline-none text-sm focus:ring-2 focus:ring-slate-900/5 focus:border-slate-855 transition-all font-semibold" placeholder="e.g. 8.20" />
                 </div>
               </div>
 
@@ -380,6 +459,7 @@ export default function AcademicsManager({ initialRecords, profileId, isMentor }
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

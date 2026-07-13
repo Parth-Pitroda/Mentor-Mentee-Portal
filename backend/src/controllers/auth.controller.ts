@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
 
 export class AuthController {
+  /**
+   * Route: POST /api/auth/signup
+   */
   static async signUp(req: Request, res: Response) {
     try {
       const { email, password, name, rollNo } = req.body;
@@ -20,6 +23,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * Route: POST /api/auth/signin
+   */
   static async signIn(req: Request, res: Response) {
     try {
       const { email, password } = req.body;
@@ -38,6 +44,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * Route: POST /api/auth/logout
+   */
   static async logout(req: Request, res: Response) {
     try {
       const sessionSecret = req.cookies["appwrite-session"];
@@ -51,6 +60,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * Route: GET /api/auth/me
+   */
   static async me(req: Request, res: Response) {
     try {
       const sessionSecret = req.cookies["appwrite-session"];

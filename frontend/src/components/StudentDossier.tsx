@@ -65,8 +65,8 @@ export default function StudentDossier({ student, latestAcademicRecord, achievem
       </div>
 
       <div className="grid grid-cols-1 gap-8 border-t border-slate-200 pt-6 md:grid-cols-3">
-        <StatCard label="Current CGPA" value={student.cgpa || "N/A"} />
-        <StatCard label="Latest SPI" value={latestAcademicRecord?.spi || "N/A"} />
+        <StatCard label="Current CGPA" value={student.cgpa !== undefined && student.cgpa !== null && student.cgpa !== "" ? Number(student.cgpa).toFixed(2) : "N/A"} />
+        <StatCard label="Latest SPI" value={latestAcademicRecord?.spi !== undefined && latestAcademicRecord?.spi !== null && latestAcademicRecord?.spi !== "" ? Number(latestAcademicRecord.spi).toFixed(2) : "N/A"} />
         <StatCard label="Total Meetings" value={studentMeetings.length} />
       </div>
       <AchievementsWidget studentId={student.$id} initialData={achievementRecords || []} />
