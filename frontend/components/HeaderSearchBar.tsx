@@ -26,7 +26,7 @@ export default function HeaderSearchBar() {
   const isMeetingsTab = searchParams.get("tab") === "meetings";
 
   return (
-    <div className="relative max-w-xs w-full flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm shadow-sm animate-in fade-in duration-300">
+    <div className="relative max-w-xs w-full flex items-center bg-white border border-slate-200 rounded px-3 py-2 text-sm shadow-sm animate-in fade-in duration-300">
       <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
       <input
         type="search"
