@@ -15,7 +15,7 @@ export default function MentorHeader({
   backUrl?: string;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mb-4 flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex items-center gap-3">
         {backUrl && (
           <Link

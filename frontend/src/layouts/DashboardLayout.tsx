@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { useAsyncData } from "@/src/hooks/useAsyncData";
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
-import { getMenteeProfile, getProfileByEmail } from "@/lib/actions/student.actions";
+import { getMenteeProfile } from "@/lib/actions/student.actions";
 import DashboardSidebarNav from "@/components/DashboardSidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import LogoutButton from "@/components/LogoutButton";
@@ -17,10 +17,8 @@ export default function DashboardLayout() {
     const user = await getLoggedInUser();
     if (!user) return null;
 
-    const [currentProfile, targetProfile] = await Promise.all([
-      getProfileByEmail(user.email),
-      getMenteeProfile(profileId),
-    ]);
+    const currentProfile = user.profile;
+    const targetProfile = await getMenteeProfile(profileId);
 
     return { user, currentProfile, targetProfile };
   }, [profileId]);

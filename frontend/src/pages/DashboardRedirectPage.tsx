@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getLoggedInUser } from "@/lib/actions/auth.actions";
-import { getProfileByEmail } from "@/lib/actions/student.actions";
 import { routeForProfile } from "@/src/utils/routing";
 import LoadingPage from "@/src/components/LoadingPage";
 
@@ -15,8 +14,7 @@ export default function DashboardRedirectPage() {
         navigate("/sign-in", { replace: true });
         return;
       }
-      const profile = await getProfileByEmail(user.email);
-      navigate(routeForProfile(profile), { replace: true });
+      navigate(routeForProfile(user.profile), { replace: true });
     }
 
     redirect();
