@@ -65,15 +65,16 @@ export default function LandingPageClient() {
           transition={{ duration: 0.35, ease: "easeInOut" }}
           className="flex flex-col items-center gap-8 max-w-3xl w-full"
         >
-          {/* Main Title: Mentor-Mentee Portal (No border, no sub-branding, strong text shadow for readability) */}
+          {/* Main Title: Mentor-Mentee Portal (Metallic Silver/Chrome Gradient) */}
           <div className="flex flex-col items-center gap-3">
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold uppercase tracking-tight text-white select-none leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
-              <span className="bg-gradient-to-b from-white to-slate-200 bg-clip-text text-transparent">Mentor-Mentee</span>{" "}
-              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(245,158,11,0.55)]">Portal</span>
-            </h1>
-            <p className="text-xs sm:text-sm font-semibold tracking-widest text-slate-200 uppercase max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+            <p className="text-xs sm:text-sm font-bold tracking-widest text-slate-300 uppercase max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
               Pandit Deendayal Energy University
             </p>
+            <div className="filter drop-shadow-[0_8px_20px_rgba(0,0,0,0.95)]">
+              <h1 className="text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight select-none leading-none bg-gradient-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent pb-1">
+                Mentor-Mentee Portal
+              </h1>
+            </div>
           </div>
 
           {/* Buttons below the title (matching theme colors, solid backings for high visibility on bright background) */}
