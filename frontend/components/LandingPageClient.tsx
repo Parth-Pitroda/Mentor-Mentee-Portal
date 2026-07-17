@@ -35,24 +35,41 @@ export default function LandingPageClient() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/15 to-black/50 pointer-events-none" />
       </div>
 
-      {/* Header containing only the clean PDEU logo on the top left */}
+      {/* Header containing the clean PDEU logo on the left and actions on the right */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }}
         animate={exitDirection ? { opacity: 0, y: -20 } : { opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className="w-full px-6 sm:px-12 py-6 z-10"
+        className="w-full px-6 sm:px-12 py-6 z-10 flex items-center justify-between"
       >
         <img 
           src="/pdeu_new_logo.png" 
           alt="PDEU Logo" 
           className="h-20 w-auto object-contain select-none"
         />
+        <div className="flex items-center gap-3 text-sm font-semibold">
+          <a 
+            href="/sign-in" 
+            onClick={(e) => handleNavigation(e, "/sign-in", "left")}
+            className="text-slate-200 hover:text-white transition-colors cursor-pointer select-none"
+          >
+            Sign In
+          </a>
+          <span className="text-slate-500/60 select-none font-light">|</span>
+          <a 
+            href="/sign-up" 
+            onClick={(e) => handleNavigation(e, "/sign-up", "right")}
+            className="text-slate-200 hover:text-white transition-colors cursor-pointer select-none"
+          >
+            Sign Up
+          </a>
+        </div>
       </motion.header>
 
       {/* Main Center Content (Center of the page) */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 z-10 select-none">
         
-        {/* Animated Title & Button Container */}
+        {/* Animated Title Container */}
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={
@@ -75,33 +92,6 @@ export default function LandingPageClient() {
                 Mentor-Mentee Portal
               </h1>
             </div>
-          </div>
-
-          {/* Buttons below the title (matching theme colors, solid backings for high visibility on bright background) */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mt-4">
-            
-            <a 
-              href="/sign-in" 
-              onClick={(e) => handleNavigation(e, "/sign-in", "left")}
-              className="w-full sm:w-auto px-10 py-3.5 bg-gradient-to-r from-[#3182CE] to-[#2B6CB0] hover:from-[#2B6CB0] hover:to-[#1A365D] text-white rounded-xl font-bold text-sm tracking-wide shadow-lg hover:scale-105 active:scale-95 transition-all duration-200 select-none text-center flex items-center justify-center gap-2 cursor-pointer border border-[#2B6CB0]"
-            >
-              Sign In
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-            </a>
-            
-            <a 
-              href="/sign-up" 
-              onClick={(e) => handleNavigation(e, "/sign-up", "right")}
-              className="w-full sm:w-auto px-10 py-3.5 border border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white bg-white/95 rounded-xl font-bold text-sm tracking-wide shadow-md hover:scale-105 active:scale-95 transition-all duration-200 select-none text-center flex items-center justify-center gap-2 cursor-pointer"
-            >
-              Sign Up
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-            </a>
-            
           </div>
         </motion.div>
       </main>
