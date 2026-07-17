@@ -29,10 +29,10 @@ export default function LandingPageClient() {
         <div 
           className="absolute inset-0 pointer-events-none" 
           style={{ 
-            backgroundImage: "radial-gradient(circle, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.45) 100%)" 
+            backgroundImage: "radial-gradient(circle, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.6) 100%)" 
           }} 
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/35 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/15 to-black/50 pointer-events-none" />
       </div>
 
       {/* Header containing only the clean PDEU logo on the top left */}
@@ -66,10 +66,14 @@ export default function LandingPageClient() {
           className="flex flex-col items-center gap-8 max-w-3xl w-full"
         >
           {/* Main Title: Mentor-Mentee Portal (No border, no sub-branding, strong text shadow for readability) */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center gap-3">
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold uppercase tracking-tight text-white select-none leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
-              Mentor-Mentee Portal
+              <span className="bg-gradient-to-b from-white to-slate-200 bg-clip-text text-transparent">Mentor-Mentee</span>{" "}
+              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(245,158,11,0.55)]">Portal</span>
             </h1>
+            <p className="text-xs sm:text-sm font-semibold tracking-widest text-slate-200 uppercase max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              Pandit Deendayal Energy University
+            </p>
           </div>
 
           {/* Buttons below the title (matching theme colors, solid backings for high visibility on bright background) */}
